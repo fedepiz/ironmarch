@@ -30,7 +30,6 @@ async fn amain() {
     let mut view = simulation::SimView::default();
     // Pre-records the kind of windows the matching requested objects are
     let mut window_kinds = vec![];
-    let mut is_paused = true;
 
     loop {
         frame_arena.reset();
@@ -67,28 +66,11 @@ async fn amain() {
 
         if !is_keyboard_taken_by_ui {
             update_camera_from_keyboard(&mut board);
-
-            if mq::is_key_pressed(mq::KeyCode::Space) {
-                is_paused = !is_paused;
-            }
         }
 
         mq::clear_background(mq::LIGHTGRAY);
         board.draw();
-        if is_paused {
-            board.billboard("Paused");
-        }
         egui_macroquad::draw();
-
-        request.num_ticks = if is_paused {
-            0
-        } else {
-            if mq::is_key_down(mq::KeyCode::LeftControl) {
-                10
-            } else {
-                1
-            }
-        };
 
         request.map_viewport = {
             let convert = |v: mq::Vec2| V2::new(v.x, v.y);
@@ -137,7 +119,7 @@ fn populate_board(board: &mut board::Board, view: &SimView, selected_entity: Opt
 
         let is_big = item.size > 1.;
 
-        let fill_color = if item.kind == MapItemKind::Site {
+        let fill_color = if !item.color {
             mq::GRAY
         } else if is_big {
             mq::GREEN

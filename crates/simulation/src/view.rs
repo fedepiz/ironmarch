@@ -10,15 +10,10 @@ pub struct SimView {
     pub objects: Vec<Option<Object>>,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-pub enum MapItemKind {
-    Site,
-}
-
 pub struct MapItem {
     pub id: ObjectId,
-    pub kind: MapItemKind,
     pub name: String,
+    pub color: bool,
     pub image: &'static str,
     pub pos: V2,
     pub size: f32,
@@ -49,22 +44,43 @@ fn map_view_lines(sites: &Sites, viewport: Extents) -> Vec<(V2, V2)> {
 }
 
 fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
-    let nodes = sim.sites.graph.nodes();
-    let sites = nodes
-        .filter(|site| viewport.contains(site.pos))
-        .filter_map(|site| {
-            Some(MapItem {
-                id: ObjectId(ObjectHandle::Site(site.id)),
-                kind: MapItemKind::Site,
-                name: String::default(),
-                image: "",
-                pos: site.pos,
-                size: 1.,
-                layer: 0,
-            })
-        });
+    let sites = sim.sites.data.values().filter_map(|site| {
+        if site.bound_entity.is_some() {
+            return None;
+        }
+        let pos = sim.sites.graph[site.id].pos;
+        if !viewport.contains(pos) {
+            return None;
+        }
+        Some(MapItem {
+            id: ObjectId(ObjectHandle::Site(site.id)),
+            name: String::default(),
+            color: false,
+            image: "",
+            pos,
+            size: 1.,
+            layer: 0,
+        })
+    });
 
-    let mut items: Vec<_> = sites.collect();
+    let locations = sim.entities.values().filter_map(|entity| {
+        let site = entity.bound_site?;
+        let pos = sim.sites.graph[site].pos;
+        if !viewport.contains(pos) {
+            return None;
+        }
+        Some(MapItem {
+            id: ObjectId(ObjectHandle::Entity(entity.id)),
+            name: entity.name.clone(),
+            color: true,
+            image: "town",
+            pos,
+            size: 2.,
+            layer: 1,
+        })
+    });
+
+    let mut items: Vec<_> = sites.chain(locations).collect();
     items.sort_by_key(|item| item.layer);
     items
 }
@@ -84,6 +100,12 @@ fn extract_object(sim: &Simulation, id: ObjectId) -> Option<Object> {
 
         ObjectHandle::Site(_) => {
             obj.set("kind", "Site");
+        }
+
+        ObjectHandle::Entity(subject) => {
+            let entity = &sim.entities[subject];
+            obj.set("name", &entity.name);
+            obj.set("kind", "Entity");
         }
     }
 

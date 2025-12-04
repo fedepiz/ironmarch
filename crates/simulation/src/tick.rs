@@ -7,7 +7,6 @@ use spatial::geom::Extents;
 
 #[derive(Default)]
 pub struct TickRequest {
-    pub num_ticks: usize,
     pub map_viewport: Extents,
     pub objects_to_extract: Vec<ObjectId>,
 }
