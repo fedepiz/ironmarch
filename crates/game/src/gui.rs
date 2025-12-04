@@ -1,0 +1,111 @@
+use simulation::Object;
+
+#[derive(Default)]
+pub(crate) struct Gui {
+    objects: Vec<(WindowKind, Object)>,
+}
+
+impl Gui {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn setup(&mut self, ctx: &egui::Context) {
+        ctx.set_pixels_per_point(1.6);
+    }
+
+    pub fn add_object(&mut self, kind: WindowKind, obj: Object) {
+        self.objects.push((kind, obj))
+    }
+
+    pub fn tick(&mut self, ctx: &egui::Context) {
+        for (window_idx, (kind, obj)) in self.objects.drain(..).enumerate() {
+            match kind {
+                WindowKind::TopStrip => top_strip(ctx, &obj),
+                WindowKind::Entity => object_ui(ctx, window_idx, &obj),
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum WindowKind {
+    TopStrip,
+    Entity,
+}
+
+fn top_strip(ctx: &egui::Context, obj: &Object) {
+    egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
+        ui.horizontal_centered(|ui| {
+            ui.label(format!("Turn Number: {}", obj.txt("turn_number")));
+        });
+    });
+}
+
+fn object_ui(ctx: &egui::Context, obj_idx: usize, obj: &Object) {
+    let window_id = format!("object_window_{obj_idx}");
+    egui::Window::new(obj.txt("name"))
+        .id(window_id.into())
+        .collapsible(false)
+        .resizable(false)
+        .show(ctx, |ui| {
+            ui.set_min_width(250.);
+
+            ui.vertical(|ui| {
+                ui.heading("Overview");
+                let table = [
+                    ("Name", "name"),
+                    ("Kind", "kind"),
+                    ("Cash", "cash"),
+                    ("Faction", "faction"),
+                    ("Country", "country"),
+                ];
+                field_table(ui, "overview-table", &table, obj);
+            });
+        });
+}
+
+fn field_table(ui: &mut egui::Ui, grid_id: &str, table: &[(&str, &str)], obj: &Object) {
+    egui::Grid::new(grid_id).show(ui, |ui| {
+        for &(label, field) in table {
+            if let Some(txt) = obj.try_text(field) {
+                ui.label(label);
+                ui.label(txt);
+                ui.end_row();
+            }
+        }
+    });
+}
+
+struct Row<'a> {
+    label: &'a str,
+    primary: &'a str,
+    tooltip: &'a [(&'a str, &'a str)],
+}
+
+fn rows_table(ui: &mut egui::Ui, grid_id: &str, table: &[Row], list: &[Object]) {
+    egui::Grid::new(grid_id).striped(true).show(ui, |ui| {
+        if list.is_empty() {
+            ui.label("Empty...");
+            return;
+        }
+        for row in table {
+            ui.label(row.label);
+        }
+        ui.end_row();
+        for obj in list {
+            for row in table {
+                let primary = obj.txt(row.primary);
+                let response = ui.label(primary);
+                if !row.tooltip.is_empty() {
+                    response.on_hover_ui(|ui| {
+                        ui.heading(format!("{} {}", row.label, primary));
+                        ui.separator();
+                        field_table(ui, "hover-grid", row.tooltip, obj);
+                    });
+                }
+            }
+            ui.end_row();
+        }
+    });
+}

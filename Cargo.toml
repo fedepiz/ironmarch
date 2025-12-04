@@ -1,0 +1,38 @@
+[package]
+name = "ironmarch"
+version = "0.1.0"
+edition = "2024"
+
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package.'*']
+opt-level = 3
+
+[workspace]
+members = ["crates/*"]
+
+[workspace.dependencies]
+anyhow = "1"
+arrayvec = "0.7"
+bumpalo = { version = "3", features = ["collections"] }
+egui = "0.31"
+egui-macroquad = "0.17.3"
+macroquad = "0.4.14"
+num_enum = "*"
+
+pathfinding = "4"
+float-ord = "0.3"
+rand = { version = "0.8", features = ["small_rng"] }
+slotmap = "1"
+
+strum = { version = "*", features = ["derive"] }
+
+game = { path = "crates/game" }
+simulation = { path = "crates/simulation" }
+util = { path = "crates/util" }
+
+
+[dependencies]
+game = { workspace = true }
