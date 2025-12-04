@@ -1138,6 +1138,7 @@ dependencies = [
  "pathfinding",
  "rand",
  "slotmap",
+ "spatial",
  "strum",
  "util",
 ]
@@ -1208,6 +1209,15 @@ dependencies = [
  "libc",
  "smithay-client-toolkit",
  "wayland-backend",
+]
+
+[[package]]
+name = "spatial"
+version = "0.1.0"
+dependencies = [
+ "pathfinding",
+ "slotmap",
+ "util",
 ]
 
 [[package]]

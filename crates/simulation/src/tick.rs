@@ -3,7 +3,7 @@ use util::arena::Arena;
 use crate::object::*;
 use crate::simulation::*;
 use crate::view;
-use crate::view::*;
+use spatial::geom::Extents;
 
 #[derive(Default)]
 pub struct TickRequest {
@@ -12,15 +12,7 @@ pub struct TickRequest {
     pub objects_to_extract: Vec<ObjectId>,
 }
 
-pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) -> SimView {
+pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) -> view::SimView {
     // Extract view
-    let mut view = SimView::default();
-    view.map_items = view::map_view_items(sim, request.map_viewport);
-    view.map_lines = view::map_view_lines(sim, request.map_viewport);
-    view.objects = request
-        .objects_to_extract
-        .iter()
-        .map(|&id| view::extract_object(sim, id))
-        .collect();
-    view
+    view::extract(sim, request.map_viewport, &request.objects_to_extract)
 }

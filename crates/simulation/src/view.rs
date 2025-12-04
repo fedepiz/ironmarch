@@ -1,5 +1,7 @@
 use crate::object::*;
 use crate::simulation::*;
+use crate::sites::Sites;
+use spatial::geom::*;
 
 #[derive(Default)]
 pub struct SimView {
@@ -23,12 +25,20 @@ pub struct MapItem {
     pub layer: u8,
 }
 
-pub(crate) fn map_view_lines(sim: &Simulation, viewport: Extents) -> Vec<(V2, V2)> {
+pub(super) fn extract(sim: &Simulation, viewport: Extents, objects: &[ObjectId]) -> SimView {
+    let mut view = SimView::default();
+    view.map_items = map_view_items(sim, viewport);
+    view.map_lines = map_view_lines(&sim.sites, viewport);
+    view.objects = objects.iter().map(|&id| extract_object(sim, id)).collect();
+    view
+}
+
+fn map_view_lines(sites: &Sites, viewport: Extents) -> Vec<(V2, V2)> {
     let mut out = Vec::with_capacity(100);
-    for (id, site) in sim.sites.iter() {
+    for site in sites.graph.nodes() {
         let parent_out = !viewport.contains(site.pos);
-        for neigh_id in sim.sites.greater_neighbours(id) {
-            let destination = sim.sites.get(neigh_id).unwrap().pos;
+        for neigh in sites.graph.greater_neighbours(site.id) {
+            let destination = sites.graph[neigh.id].pos;
             let child_out = !viewport.contains(destination);
             if !parent_out || !child_out {
                 out.push((site.pos, destination));
@@ -38,14 +48,13 @@ pub(crate) fn map_view_lines(sim: &Simulation, viewport: Extents) -> Vec<(V2, V2
     out
 }
 
-pub(crate) fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
-    let sites = sim
-        .sites
-        .iter()
-        .filter(|(_, site)| viewport.contains(site.pos))
-        .filter_map(|(site_id, site)| {
+fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
+    let nodes = sim.sites.graph.nodes();
+    let sites = nodes
+        .filter(|site| viewport.contains(site.pos))
+        .filter_map(|site| {
             Some(MapItem {
-                id: ObjectId(ObjectHandle::Site(site_id)),
+                id: ObjectId(ObjectHandle::Site(site.id)),
                 kind: MapItemKind::Site,
                 name: String::default(),
                 image: "",
@@ -60,7 +69,7 @@ pub(crate) fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem
     items
 }
 
-pub(super) fn extract_object(sim: &mut Simulation, id: ObjectId) -> Option<Object> {
+fn extract_object(sim: &Simulation, id: ObjectId) -> Option<Object> {
     let mut obj = Object::new();
     obj.set("id", id);
 

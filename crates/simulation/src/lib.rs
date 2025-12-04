@@ -1,5 +1,5 @@
 mod simulation;
-pub use simulation::*;
+pub use simulation::Simulation;
 
 mod object;
 pub use object::{Object, ObjectId};
@@ -11,3 +11,7 @@ pub use tick::*;
 
 mod view;
 pub use view::*;
+
+pub use spatial::geom::{Extents, V2};
+
+mod init;

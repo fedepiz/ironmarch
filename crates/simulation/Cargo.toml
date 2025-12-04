@@ -12,4 +12,5 @@ rand = { workspace = true }
 slotmap = { workspace = true }
 strum = { workspace = true }
 
+spatial = { workspace = true}
 util = { workspace = true }
