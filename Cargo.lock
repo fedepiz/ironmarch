@@ -1140,6 +1140,7 @@ dependencies = [
  "slotmap",
  "spatial",
  "strum",
+ "tinybitset",
  "util",
 ]
 
@@ -1270,6 +1271,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tinybitset"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f025a59893672a265b0b401a06acd92c7123aebc3c050bdb11945bf1bed0c566"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]

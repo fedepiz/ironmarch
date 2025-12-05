@@ -26,8 +26,8 @@ pathfinding = "4"
 float-ord = "0.3"
 rand = { version = "0.8", features = ["small_rng"] }
 slotmap = "1"
-
 strum = { version = "*", features = ["derive"] }
+tinybitset = "0.0.2"
 
 game = { path = "crates/game" }
 simulation = { path = "crates/simulation" }

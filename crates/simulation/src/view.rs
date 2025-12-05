@@ -1,3 +1,4 @@
+use crate::entity::*;
 use crate::object::*;
 use crate::simulation::*;
 use crate::sites::Sites;
@@ -73,7 +74,7 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
             id: ObjectId(ObjectHandle::Entity(entity.id)),
             name: entity.name.clone(),
             color: true,
-            image: "town",
+            image: entity.sprite,
             pos,
             size: 2.,
             layer: 1,
@@ -106,15 +107,14 @@ fn extract_object(sim: &Simulation, id: ObjectId) -> Option<Object> {
         ObjectHandle::Entity(subject) => {
             let entity = &sim.entities[subject];
             obj.set("name", &entity.name);
-            obj.set("kind", "Entity");
+            obj.set("kind", entity.kind_name);
 
             let faction = sim.entities[subject]
                 .hierarchies
                 .parent(HierarchyName::Faction);
             obj.set("faction", &sim.entities[faction].name);
 
-            let root =
-                &sim.entities[root_of(&sim.entities, HierarchyName::Faction, entity.id)].name;
+            let root = &sim.entities[sim.entities.root_of(HierarchyName::Faction, entity.id)].name;
             obj.set("root", root);
         }
     }

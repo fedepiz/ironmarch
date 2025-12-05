@@ -1,6 +1,7 @@
 use slotmap::Key;
 use util::tagged::TaggedCollection;
 
+use crate::entity::*;
 use crate::{simulation::*, sites::SiteData};
 
 pub(crate) fn init(sim: &mut Simulation) {
@@ -100,23 +101,69 @@ fn init_locations(sim: &mut Simulation) {
     let rheged = {
         let reghed = sim.entities.spawn();
         reghed.name = "Rheged".to_string();
+        reghed.kind_name = "Faction";
+        reghed.flags.set(Flag::IsFaction, true);
         reghed.id
     };
-    set_root(&mut sim.entities, HierarchyName::Faction, rheged);
+    sim.entities.set_root(HierarchyName::Faction, rheged);
 
     struct Desc {
         name: &'static str,
         site: &'static str,
+        kind: Kind,
     }
 
-    const DESCS: &[Desc] = &[Desc {
-        name: "Caer Ligualid",
-        site: "caer_ligualid",
-    }];
+    enum Kind {
+        Town,
+        Village,
+        Hillfort,
+    }
+
+    const DESCS: &[Desc] = &[
+        Desc {
+            name: "Caer Ligualid",
+            site: "caer_ligualid",
+            kind: Kind::Town,
+        },
+        Desc {
+            name: "Anava",
+            site: "anava",
+            kind: Kind::Village,
+        },
+        Desc {
+            name: "Din Drust",
+            site: "din_drust",
+            kind: Kind::Hillfort,
+        },
+    ];
 
     for desc in DESCS {
         let entity = sim.entities.spawn();
         entity.name = desc.name.to_string();
+
+        struct KindData {
+            name: &'static str,
+            image: &'static str,
+        }
+
+        let kind = match desc.kind {
+            Kind::Town => KindData {
+                name: "Town",
+                image: "town",
+            },
+            Kind::Village => KindData {
+                name: "Village",
+                image: "village",
+            },
+            Kind::Hillfort => KindData {
+                name: "Hillfort",
+                image: "hillfort",
+            },
+        };
+        entity.kind_name = kind.name;
+        entity.sprite = kind.image;
+
+        entity.flags.set(Flag::IsLocation, true);
 
         {
             let site = match sim.sites.lookup_data_mut(desc.site) {
@@ -130,7 +177,8 @@ fn init_locations(sim: &mut Simulation) {
         }
 
         let entity = entity.id;
-        set_parent(&mut sim.entities, HierarchyName::Faction, entity, rheged);
+        sim.entities
+            .set_parent(HierarchyName::Faction, entity, rheged);
     }
 }
 
