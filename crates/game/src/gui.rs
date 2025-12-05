@@ -56,9 +56,8 @@ fn object_ui(ctx: &egui::Context, obj_idx: usize, obj: &Object) {
                 let table = [
                     ("Name", "name"),
                     ("Kind", "kind"),
-                    ("Cash", "cash"),
                     ("Faction", "faction"),
-                    ("Country", "country"),
+                    ("Root", "root"),
                 ];
                 field_table(ui, "overview-table", &table, obj);
             });

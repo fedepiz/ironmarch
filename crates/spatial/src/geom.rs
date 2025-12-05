@@ -10,6 +10,8 @@ impl V2 {
 
     pub const ZERO: V2 = V2::splat(0.);
 
+    pub const INFINITY: V2 = V2::splat(f32::INFINITY);
+
     pub const fn splat(v: f32) -> Self {
         Self::new(v, v)
     }

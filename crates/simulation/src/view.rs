@@ -1,6 +1,7 @@
 use crate::object::*;
 use crate::simulation::*;
 use crate::sites::Sites;
+use slotmap::Key;
 use spatial::geom::*;
 
 #[derive(Default)]
@@ -45,10 +46,10 @@ fn map_view_lines(sites: &Sites, viewport: Extents) -> Vec<(V2, V2)> {
 
 fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
     let sites = sim.sites.data.values().filter_map(|site| {
-        if site.bound_entity.is_some() {
+        if !site.bound_entity.is_null() {
             return None;
         }
-        let pos = sim.sites.graph[site.id].pos;
+        let pos = sim.sites.pos_of(site.id);
         if !viewport.contains(pos) {
             return None;
         }
@@ -64,8 +65,7 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
     });
 
     let locations = sim.entities.values().filter_map(|entity| {
-        let site = entity.bound_site?;
-        let pos = sim.sites.graph[site].pos;
+        let pos = sim.sites.pos_of(entity.bound_site);
         if !viewport.contains(pos) {
             return None;
         }
@@ -99,6 +99,7 @@ fn extract_object(sim: &Simulation, id: ObjectId) -> Option<Object> {
         }
 
         ObjectHandle::Site(_) => {
+            obj.set("name", "Site");
             obj.set("kind", "Site");
         }
 
@@ -106,6 +107,15 @@ fn extract_object(sim: &Simulation, id: ObjectId) -> Option<Object> {
             let entity = &sim.entities[subject];
             obj.set("name", &entity.name);
             obj.set("kind", "Entity");
+
+            let faction = sim.entities[subject]
+                .hierarchies
+                .parent(HierarchyName::Faction);
+            obj.set("faction", &sim.entities[faction].name);
+
+            let root =
+                &sim.entities[root_of(&sim.entities, HierarchyName::Faction, entity.id)].name;
+            obj.set("root", root);
         }
     }
 

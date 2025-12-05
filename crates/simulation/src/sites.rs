@@ -41,6 +41,13 @@ impl Sites {
             }
         }
     }
+
+    pub(crate) fn pos_of(&self, site: SiteId) -> V2 {
+        self.graph
+            .get(site)
+            .map(|site| site.pos)
+            .unwrap_or(V2::INFINITY)
+    }
 }
 
 impl TaggedCollection for Sites {
@@ -54,5 +61,5 @@ impl TaggedCollection for Sites {
 #[derive(Default)]
 pub(crate) struct SiteData {
     pub id: SiteId,
-    pub bound_entity: Option<EntityId>,
+    pub bound_entity: EntityId,
 }

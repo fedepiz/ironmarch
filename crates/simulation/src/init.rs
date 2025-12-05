@@ -1,3 +1,4 @@
+use slotmap::Key;
 use util::tagged::TaggedCollection;
 
 use crate::{simulation::*, sites::SiteData};
@@ -96,6 +97,13 @@ fn init_sites(sim: &mut Simulation) {
 }
 
 fn init_locations(sim: &mut Simulation) {
+    let rheged = {
+        let reghed = sim.entities.spawn();
+        reghed.name = "Rheged".to_string();
+        reghed.id
+    };
+    set_root(&mut sim.entities, HierarchyName::Faction, rheged);
+
     struct Desc {
         name: &'static str,
         site: &'static str,
@@ -120,13 +128,16 @@ fn init_locations(sim: &mut Simulation) {
 
             bind_entity_to_site(entity, site);
         }
+
+        let entity = entity.id;
+        set_parent(&mut sim.entities, HierarchyName::Faction, entity, rheged);
     }
 }
 
 #[inline]
 fn bind_entity_to_site(entity: &mut EntityData, site: &mut SiteData) {
-    assert!(entity.bound_site.is_none());
-    assert!(site.bound_entity.is_none());
-    entity.bound_site = Some(site.id);
-    site.bound_entity = Some(entity.id);
+    assert!(entity.bound_site.is_null());
+    assert!(site.bound_entity.is_null());
+    entity.bound_site = site.id;
+    site.bound_entity = entity.id;
 }
