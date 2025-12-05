@@ -4,12 +4,14 @@ use crate::simulation::*;
 use crate::sites::Sites;
 use slotmap::Key;
 use spatial::geom::*;
+use util::arena::Arena;
 
 #[derive(Default)]
 pub struct SimView {
     pub map_lines: Vec<(V2, V2)>,
     pub map_items: Vec<MapItem>,
-    pub objects: Vec<Option<Object>>,
+    pub root: Object,
+    pub selected: Object,
 }
 
 pub struct MapItem {
@@ -22,11 +24,19 @@ pub struct MapItem {
     pub layer: u8,
 }
 
-pub(super) fn extract(sim: &Simulation, viewport: Extents, objects: &[ObjectId]) -> SimView {
+pub(super) fn extract(
+    sim: &Simulation,
+    arena: &Arena,
+    viewport: Extents,
+    selected: ObjectId,
+) -> SimView {
     let mut view = SimView::default();
     view.map_items = map_view_items(sim, viewport);
     view.map_lines = map_view_lines(&sim.sites, viewport);
-    view.objects = objects.iter().map(|&id| extract_object(sim, id)).collect();
+
+    view.root = extract_object(sim, arena, ObjectId::global());
+    view.selected = extract_object(sim, arena, selected);
+
     view
 }
 
@@ -76,7 +86,7 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
             color: true,
             image: entity.sprite,
             pos,
-            size: 2.,
+            size: entity.size,
             layer: 1,
         })
     });
@@ -86,14 +96,12 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
     items
 }
 
-fn extract_object(sim: &Simulation, id: ObjectId) -> Option<Object> {
+fn extract_object(sim: &Simulation, arena: &Arena, id: ObjectId) -> Object {
     let mut obj = Object::new();
     obj.set("id", id);
 
     match id.0 {
-        ObjectHandle::Null => {
-            return None;
-        }
+        ObjectHandle::Null => {}
 
         ObjectHandle::Global => {
             obj.set("turn_number", format!("{}", sim.turn_number));
@@ -115,9 +123,22 @@ fn extract_object(sim: &Simulation, id: ObjectId) -> Option<Object> {
             obj.set("faction", &sim.entities[faction].name);
 
             let root = &sim.entities[sim.entities.root_of(HierarchyName::Faction, entity.id)].name;
-            obj.set("root", root);
+            obj.set("reign", root);
+
+            obj.set(
+                "hierarchy",
+                sim.entities
+                    .ancestry(arena, HierarchyName::Faction, entity.id)
+                    .iter()
+                    .map(|&id| {
+                        let mut obj = Object::new();
+                        obj.set("name", &sim.entities[id].name);
+                        obj
+                    })
+                    .collect::<Vec<_>>(),
+            )
         }
     }
 
-    Some(obj)
+    obj
 }

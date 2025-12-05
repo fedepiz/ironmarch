@@ -1,8 +1,12 @@
-use simulation::Object;
+use simulation::{Object, ObjectId};
 
 #[derive(Default)]
-pub(crate) struct Gui {
-    objects: Vec<(WindowKind, Object)>,
+pub(crate) struct Gui {}
+
+#[derive(Default)]
+pub(crate) struct Actions {
+    pub next_turn: bool,
+    pub selection: ObjectId,
 }
 
 impl Gui {
@@ -14,38 +18,34 @@ impl Gui {
         ctx.set_pixels_per_point(1.6);
     }
 
-    pub fn add_object(&mut self, kind: WindowKind, obj: Object) {
-        self.objects.push((kind, obj))
-    }
+    pub fn tick(&mut self, ctx: &egui::Context, root: &Object, selected: &Object) -> Actions {
+        let mut actions = Actions::default();
+        actions.selection = selected.id("id");
 
-    pub fn tick(&mut self, ctx: &egui::Context) {
-        for (window_idx, (kind, obj)) in self.objects.drain(..).enumerate() {
-            match kind {
-                WindowKind::TopStrip => top_strip(ctx, &obj),
-                WindowKind::Entity => object_ui(ctx, window_idx, &obj),
-            }
-        }
+        top_strip(ctx, root, &mut actions);
+
+        object_ui(ctx, selected, &mut actions);
+        actions
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum WindowKind {
-    TopStrip,
-    Entity,
-}
-
-fn top_strip(ctx: &egui::Context, obj: &Object) {
+fn top_strip(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
     egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
         ui.horizontal_centered(|ui| {
+            if ui.small_button("Next Turn").clicked() {
+                actions.next_turn = true;
+            }
             ui.label(format!("Turn Number: {}", obj.txt("turn_number")));
         });
     });
 }
 
-fn object_ui(ctx: &egui::Context, obj_idx: usize, obj: &Object) {
-    let window_id = format!("object_window_{obj_idx}");
-    egui::Window::new(obj.txt("name"))
-        .id(window_id.into())
+fn object_ui(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
+    let id = obj.id("id");
+    if !id.is_valid() {
+        return;
+    }
+    egui::Window::new("Selected Entity")
         .collapsible(false)
         .resizable(false)
         .show(ctx, |ui| {
@@ -57,7 +57,7 @@ fn object_ui(ctx: &egui::Context, obj_idx: usize, obj: &Object) {
                     ("Name", "name"),
                     ("Kind", "kind"),
                     ("Faction", "faction"),
-                    ("Root", "root"),
+                    ("Reign", "reign"),
                 ];
                 field_table(ui, "overview-table", &table, obj);
             });

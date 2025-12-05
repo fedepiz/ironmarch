@@ -1,40 +1,13 @@
 use crate::sites::SiteId;
+use macros::*;
 use slotmap::*;
 use strum::{EnumCount, EnumIter, IntoEnumIterator};
 use tinybitset::TinyBitSet;
 use util::{
-    arena::ArenaSafe,
+    arena::{Arena, ArenaSafe},
+    misc::VecExt,
     tagged::{TaggedCollection, Tags},
 };
-
-macro_rules! get_or_return {
-    ($e:expr) => {
-        match $e {
-            Some(x) => x,
-            _ => {
-                return;
-            }
-        }
-    };
-}
-
-trait VecExt<T> {
-    fn sorted_insert(&mut self, item: T);
-}
-
-impl<T: Ord> VecExt<T> for Vec<T> {
-    #[inline]
-    fn sorted_insert(&mut self, element: T) {
-        match self.binary_search(&element) {
-            Ok(idx) => {
-                self[idx] = element;
-            }
-            Err(idx) => {
-                self.insert(idx, element);
-            }
-        }
-    }
-}
 
 new_key_type! { pub(crate) struct EntityId; }
 
@@ -51,8 +24,9 @@ pub(crate) struct EntityData {
     // Relations
     /// Parent-child relations
     pub hierarchies: HierarchyLinks,
-    /// Sprite
+    // Appearence
     pub sprite: &'static str,
+    pub size: f32,
     /// Set of flags
     pub flags: Flags,
 }
@@ -83,10 +57,20 @@ impl Entities {
     }
 
     pub(crate) fn spawn(&mut self) -> &mut EntityData {
+        self.spawn_with_tag("")
+    }
+
+    pub(crate) fn spawn_with_tag(&mut self, tag: &str) -> &mut EntityData {
         let id = self.entries.insert(EntityData::default());
         let data = &mut self.entries[id];
         data.id = id;
         data.kind_name = "UNKNOWN_KIND";
+
+        if !tag.is_empty() {
+            self.tags.unbind(tag);
+            self.tags.insert(tag, data.id);
+        }
+
         data
     }
 
@@ -99,6 +83,10 @@ impl Entities {
         if let Some(_) = self.entries.remove(id) {
             self.tags.remove(&id);
         }
+    }
+
+    pub(crate) fn lookup(&self, tag: &str) -> EntityId {
+        self.tags.lookup(tag).unwrap_or_default()
     }
 
     // pub(crate) fn iter<'a>(&'a self) -> slotmap::basic::Iter<'a, EntityId, EntityData> {
@@ -144,9 +132,11 @@ impl<'a> TaggedCollection for &'a Entities {
 }
 
 // Parent-child relationships
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, EnumIter, EnumCount)]
 pub(crate) enum HierarchyName {
+    /// Links a faction to the location that act as its capital
+    Capital,
+    /// Links a faction to its member entities
     Faction,
 }
 
@@ -173,26 +163,48 @@ impl HierarchyLinks {
             .map(|x| x.children.as_slice())
             .unwrap_or_default()
     }
+
+    pub(crate) fn singular_child(&self, rel: HierarchyName) -> EntityId {
+        let slice = self.children(rel);
+        assert!(slice.len() < 2);
+        slice.first().copied().unwrap_or_default()
+    }
 }
 
 impl Entities {
     /// Recursively search for the root of the entity in the hierarchy, returns a null entity if
     /// the entity is not part of the hierarchy at all
     pub(crate) fn root_of(&self, rel: HierarchyName, entity: EntityId) -> EntityId {
-        let mut id = entity;
+        let mut this = entity;
         loop {
-            let parent = self[id].hierarchies.parent(rel);
-            if parent.is_null() || parent == id {
-                return parent;
-            } else {
-                id = parent;
+            let parent = self[this].hierarchies.parent(rel);
+            if parent.is_null() || parent == this {
+                break;
             }
+            this = parent;
         }
+        this
     }
 
-    /// Mark the entity as being a root of the given hierarchy
-    pub(crate) fn set_root(&mut self, rel: HierarchyName, entity: EntityId) {
-        self.set_parent(rel, entity, entity);
+    pub(crate) fn ancestry<'a>(
+        &self,
+        arena: &'a Arena,
+        rel: HierarchyName,
+        entity: EntityId,
+    ) -> &'a [EntityId] {
+        let mut out = arena.new_vec();
+
+        let mut this = entity;
+        while !this.is_null() {
+            out.push(this);
+            let parent = self[this].hierarchies.parent(rel);
+            if parent.is_null() || parent == this {
+                break;
+            }
+            this = parent;
+        }
+
+        out.into_bump_slice()
     }
 
     pub(crate) fn set_parent(&mut self, rel: HierarchyName, child: EntityId, parent: EntityId) {
@@ -239,8 +251,10 @@ impl Entities {
     #[inline]
     pub(crate) fn remove_all_children(&mut self, rel: HierarchyName, parent: EntityId) {
         let parent = get_or_return!(self.get_mut(parent));
+        // Get out the children array
         let children = std::mem::take(&mut parent.hierarchies.0[rel as usize].children);
         let parent = parent.id;
+        // And remove the parent one-by-one, via resetting it to EntityId::null
         for child in children {
             let child = self.get_mut(child).unwrap();
             let p = std::mem::take(&mut child.hierarchies.0[rel as usize].parent);

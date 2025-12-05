@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use slotmap::Key;
+
 use crate::entity::EntityId;
 use crate::sites::SiteId;
 
@@ -9,6 +11,14 @@ pub struct ObjectId(pub(crate) ObjectHandle);
 impl ObjectId {
     pub fn global() -> Self {
         Self(ObjectHandle::Global)
+    }
+
+    pub fn is_valid(self) -> bool {
+        match self.0 {
+            ObjectHandle::Null => false,
+            ObjectHandle::Entity(id) => !id.is_null(),
+            _ => true,
+        }
     }
 }
 

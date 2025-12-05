@@ -13,5 +13,6 @@ slotmap = { workspace = true }
 strum = { workspace = true }
 tinybitset = { workspace = true }
 
-spatial = { workspace = true}
+macros = { workspace = true }
+spatial = { workspace = true }
 util = { workspace = true }

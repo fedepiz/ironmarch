@@ -29,6 +29,7 @@ slotmap = "1"
 strum = { version = "*", features = ["derive"] }
 tinybitset = "0.0.2"
 
+macros = { path = "crates/macros" }
 game = { path = "crates/game" }
 simulation = { path = "crates/simulation" }
 spatial = { path = "crates/spatial" }

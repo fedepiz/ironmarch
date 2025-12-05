@@ -617,6 +617,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64b1d96218903768c1ce078b657c0d5965465c95a60d2682fd97443c9d2483dd"
 
 [[package]]
+name = "macros"
+version = "0.1.0"
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1134,6 +1138,7 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "float-ord",
+ "macros",
  "num_enum",
  "pathfinding",
  "rand",

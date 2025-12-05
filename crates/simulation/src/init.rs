@@ -1,3 +1,4 @@
+use macros::*;
 use slotmap::Key;
 use util::tagged::TaggedCollection;
 
@@ -6,10 +7,29 @@ use crate::{simulation::*, sites::SiteData};
 
 pub(crate) fn init(sim: &mut Simulation) {
     sim.turn_number = 1;
-
     init_sites(sim);
-
+    init_factions(sim);
     init_locations(sim);
+}
+
+macro_rules! lookup_or_continue {
+    ($sim:expr, $tag:expr) => {{
+        let tag: &str = $tag;
+        let x = ($sim).entities.lookup(tag);
+        if x.is_null() {
+            continue;
+        }
+        x
+    }};
+    ($sim:expr, $tag:expr, $kind:literal) => {{
+        let tag: &str = $tag;
+        let x = ($sim).entities.lookup(tag);
+        if x.is_null() {
+            println!("Unknown {} '{tag}'", $kind);
+            continue;
+        }
+        x
+    }};
 }
 
 fn init_sites(sim: &mut Simulation) {
@@ -79,38 +99,53 @@ fn init_sites(sim: &mut Simulation) {
     ];
 
     for (tag1, tag2) in CONNECTIONS {
-        let id1 = match sim.sites.lookup(&tag1) {
-            Some(id) => id,
-            None => {
-                println!("Unknown site '{tag1}'");
-                continue;
-            }
-        };
-        let id2 = match sim.sites.lookup(&tag2) {
-            Some(id) => id,
-            None => {
-                println!("Unknown site '{tag2}'");
-                continue;
-            }
-        };
+        let id1 = get_or_continue!(sim.sites.lookup(&tag1), "Unknown site '{tag1}'");
+        let id2 = get_or_continue!(sim.sites.lookup(&tag2), "Unknown site '{tag2}'");
         sim.sites.graph.connect(id1, id2);
     }
 }
 
-fn init_locations(sim: &mut Simulation) {
-    let rheged = {
-        let reghed = sim.entities.spawn();
-        reghed.name = "Rheged".to_string();
-        reghed.kind_name = "Faction";
-        reghed.flags.set(Flag::IsFaction, true);
-        reghed.id
-    };
-    sim.entities.set_root(HierarchyName::Faction, rheged);
+fn init_factions(sim: &mut Simulation) {
+    struct Desc {
+        tag: &'static str,
+        name: &'static str,
+        parent: &'static str,
+    }
 
+    const DESCS: &[Desc] = &[
+        Desc {
+            tag: "rheged",
+            name: "Rheged",
+            parent: "",
+        },
+        Desc {
+            tag: "clan_drust",
+            name: "Clan Drust",
+            parent: "rheged",
+        },
+    ];
+
+    for desc in DESCS {
+        let entity = sim.entities.spawn_with_tag(desc.tag);
+        entity.name = desc.name.to_string();
+        entity.kind_name = "Faction";
+        entity.flags.set(Flag::IsFaction, true);
+    }
+
+    for desc in DESCS {
+        let entity = lookup_or_continue!(sim, desc.tag, "faction");
+        let parent = lookup_or_continue!(sim, desc.parent);
+        sim.entities
+            .set_parent(HierarchyName::Faction, entity, parent);
+    }
+}
+
+fn init_locations(sim: &mut Simulation) {
     struct Desc {
         name: &'static str,
         site: &'static str,
         kind: Kind,
+        faction: &'static str,
     }
 
     enum Kind {
@@ -124,61 +159,69 @@ fn init_locations(sim: &mut Simulation) {
             name: "Caer Ligualid",
             site: "caer_ligualid",
             kind: Kind::Town,
+            faction: "rheged",
         },
         Desc {
             name: "Anava",
             site: "anava",
             kind: Kind::Village,
+            faction: "rheged",
         },
         Desc {
             name: "Din Drust",
             site: "din_drust",
             kind: Kind::Hillfort,
+            faction: "clan_drust",
         },
     ];
 
     for desc in DESCS {
+        let faction = lookup_or_continue!(sim, desc.faction, "faction");
+        let site = get_or_continue!(sim.sites.lookup_data_mut(desc.site), "Unknown site");
+
         let entity = sim.entities.spawn();
         entity.name = desc.name.to_string();
 
         struct KindData {
             name: &'static str,
             image: &'static str,
+            size: f32,
         }
 
         let kind = match desc.kind {
             Kind::Town => KindData {
                 name: "Town",
                 image: "town",
+                size: 2.,
             },
             Kind::Village => KindData {
                 name: "Village",
                 image: "village",
+                size: 1.4,
             },
             Kind::Hillfort => KindData {
                 name: "Hillfort",
                 image: "hillfort",
+                size: 1.75,
             },
         };
+
         entity.kind_name = kind.name;
         entity.sprite = kind.image;
+        entity.size = kind.size;
 
         entity.flags.set(Flag::IsLocation, true);
 
-        {
-            let site = match sim.sites.lookup_data_mut(desc.site) {
-                Some(x) => x,
-                None => {
-                    continue;
-                }
-            };
-
-            bind_entity_to_site(entity, site);
-        }
+        bind_entity_to_site(entity, site);
 
         let entity = entity.id;
-        sim.entities
-            .set_parent(HierarchyName::Faction, entity, rheged);
+
+        for (rel, child, parent) in [
+            (HierarchyName::Faction, entity, faction),
+            (HierarchyName::Capital, entity, faction),
+        ] {
+            sim.entities.set_parent(rel, child, parent);
+        }
     }
 }
 

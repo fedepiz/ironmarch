@@ -2,7 +2,7 @@ use macroquad::prelude as mq;
 use simulation::*;
 use util::arena::Arena;
 
-use crate::{assets::Assets, gui::WindowKind, *};
+use crate::{assets::Assets, *};
 
 pub fn start() {
     let config = mq::Conf {
@@ -25,11 +25,10 @@ async fn amain() {
     egui_macroquad::cfg(|ctx| gui.setup(ctx));
 
     let mut board = board::Board::new(20., &assets);
-    let mut selected_entity: Option<ObjectId> = None;
+    let mut selected_entity = ObjectId::default();
 
     let mut view = simulation::SimView::default();
     // Pre-records the kind of windows the matching requested objects are
-    let mut window_kinds = vec![];
 
     loop {
         frame_arena.reset();
@@ -42,12 +41,10 @@ async fn amain() {
         let mut is_mouse_over_ui = false;
         let mut is_keyboard_taken_by_ui = false;
         egui_macroquad::ui(|ctx| {
-            for (kind, obj) in window_kinds.drain(..).zip(view.objects.drain(..)) {
-                if let Some(obj) = obj {
-                    gui.add_object(kind, obj);
-                }
-            }
-            gui.tick(ctx);
+            let actions = gui.tick(ctx, &view.root, &view.selected);
+            request.end_turn = actions.next_turn;
+            selected_entity = actions.selection;
+
             is_mouse_over_ui = ctx.wants_pointer_input();
             is_keyboard_taken_by_ui = ctx.wants_keyboard_input();
         });
@@ -60,12 +57,17 @@ async fn amain() {
                 selected_entity = board
                     .hovered()
                     .and_then(|handle| map_item_ids.get(handle.0))
-                    .copied();
+                    .copied()
+                    .unwrap_or_default();
             }
         }
 
         if !is_keyboard_taken_by_ui {
             update_camera_from_keyboard(&mut board);
+
+            if mq::is_key_pressed(mq::KeyCode::Space) {
+                request.end_turn = true;
+            }
         }
 
         mq::clear_background(mq::LIGHTGRAY);
@@ -84,23 +86,14 @@ async fn amain() {
             }
         };
 
-        {
-            // Prepare next tick object requests
-            window_kinds.clear();
-
-            request.objects_to_extract.push(ObjectId::global());
-            window_kinds.push(WindowKind::TopStrip);
-
-            request.objects_to_extract.extend(selected_entity);
-            window_kinds.extend(selected_entity.map(|_| WindowKind::Entity));
-        }
+        request.selected_object = selected_entity;
 
         view = sim.tick(request, &frame_arena);
         mq::next_frame().await;
     }
 }
 
-fn populate_board(board: &mut board::Board, view: &SimView, selected_entity: Option<ObjectId>) {
+fn populate_board(board: &mut board::Board, view: &SimView, selected_entity: ObjectId) {
     board.clear();
     let mut ids = Vec::with_capacity(view.map_items.len());
     // Lines
@@ -115,7 +108,7 @@ fn populate_board(board: &mut board::Board, view: &SimView, selected_entity: Opt
         let handle = board::Handle(ids.len());
         ids.push(item.id);
 
-        let is_selected = Some(item.id) == selected_entity;
+        let is_selected = item.id == selected_entity;
 
         let is_big = item.size > 1.;
 
