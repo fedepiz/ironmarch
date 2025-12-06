@@ -17,6 +17,13 @@ impl ObjectId {
         Self(ObjectHandle::Entity(id))
     }
 
+    pub(crate) fn as_entity(self) -> Option<EntityId> {
+        match self.0 {
+            ObjectHandle::Entity(id) => Some(id),
+            _ => None,
+        }
+    }
+
     pub fn is_valid(self) -> bool {
         match self.0 {
             ObjectHandle::Null => false,

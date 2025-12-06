@@ -35,29 +35,16 @@ pub(crate) struct EntityData {
     pub name_lists: Option<Box<NameLists>>,
 }
 
+#[derive(Default)]
 pub(crate) struct Entities {
     entries: SlotMap<EntityId, EntityData>,
     tags: Tags<EntityId>,
-    dummy: EntityId,
-}
-
-impl Default for Entities {
-    fn default() -> Self {
-        Self::new()
-    }
+    dummy: EntityData,
 }
 
 impl Entities {
     pub(crate) fn new() -> Self {
-        let mut this = Self {
-            entries: Default::default(),
-            tags: Tags::default(),
-            dummy: Default::default(),
-        };
-        let dummy = this.spawn();
-        dummy.name = "NULL".to_string();
-        this.dummy = dummy.id;
-        this
+        Self::default()
     }
 
     pub(crate) fn spawn(&mut self) -> &mut EntityData {
@@ -113,7 +100,7 @@ impl std::ops::Index<EntityId> for Entities {
         if !index.is_null() {
             &self.entries[index]
         } else {
-            &self.entries[self.dummy]
+            &self.dummy
         }
     }
 }

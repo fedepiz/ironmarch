@@ -10,6 +10,7 @@ use crate::view;
 pub struct TickRequest {
     pub view: ViewRequest,
     pub end_turn: bool,
+    pub make_active: Option<ObjectId>,
 }
 
 #[derive(Default)]
@@ -23,6 +24,11 @@ pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) ->
     if request.end_turn {
         sim.turn_number += 1;
     }
+
+    sim.active_agent = request
+        .make_active
+        .and_then(|x| x.as_entity())
+        .unwrap_or(sim.active_agent);
 
     refresh_colours(sim);
 

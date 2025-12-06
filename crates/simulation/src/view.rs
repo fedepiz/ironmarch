@@ -131,6 +131,10 @@ fn extract_object(sim: &Simulation, arena: &Arena, id: ObjectId) -> Object {
             let mut obj = Object::new();
             obj.set("id", id);
             obj.set("turn_number", format!("{}", sim.turn_number));
+            obj.set(
+                "active_agent",
+                extract_entity(sim, arena, &sim.entities[sim.active_agent]),
+            );
             obj
         }
 
@@ -152,33 +156,48 @@ fn extract_object(sim: &Simulation, arena: &Arena, id: ObjectId) -> Object {
 fn extract_entity(sim: &Simulation, arena: &Arena, subject: &EntityData) -> Object {
     let mut obj = Object::new();
     obj.set("id", ObjectId::entity(subject.id));
-    obj.set("name", &subject.name);
-    obj.set("kind", subject.kind_name);
-
-    let faction = subject.hierarchies.parent(HierarchyName::Faction);
-    obj.set("faction", &sim.entities[faction].name);
-
-    let root = &sim.entities[sim.entities.root_of(HierarchyName::Faction, subject.id)].name;
-    obj.set("reign", root);
-
     obj.set(
-        "hierarchy",
-        extract_reference_list_from_ids(
-            sim,
-            sim.entities
-                .ancestry(arena, HierarchyName::Faction, subject.id),
-        ),
+        "name",
+        if subject.id.is_null() {
+            "N/A"
+        } else {
+            &subject.name
+        },
     );
 
-    if subject.flags.get(Flag::IsPlace) {
-        obj.set("people_here", {
-            let list = sim.entities.children_with_flags(
-                subject,
-                HierarchyName::PlaceOf,
-                &[entities::Flag::IsPerson],
-            );
-            extract_reference_list(list)
-        });
+    if !subject.id.is_null() {
+        obj.set("kind", subject.kind_name);
+
+        let faction = subject.hierarchies.parent(HierarchyName::Faction);
+        obj.set("faction", &sim.entities[faction].name);
+
+        let root = &sim.entities[sim.entities.root_of(HierarchyName::Faction, subject.id)].name;
+        obj.set("reign", root);
+
+        obj.set(
+            "hierarchy",
+            extract_reference_list_from_ids(
+                sim,
+                sim.entities
+                    .ancestry(arena, HierarchyName::Faction, subject.id),
+            ),
+        );
+
+        obj.set(
+            "can_make_active_agent",
+            subject.flags.get(entities::Flag::IsPerson),
+        );
+
+        if subject.flags.get(Flag::IsPlace) {
+            obj.set("people_here", {
+                let list = sim.entities.children_with_flags(
+                    subject,
+                    HierarchyName::PlaceOf,
+                    &[entities::Flag::IsPerson],
+                );
+                extract_reference_list(list)
+            });
+        }
     }
 
     obj

@@ -7,6 +7,7 @@ pub(crate) struct Gui {}
 pub(crate) struct Actions {
     pub next_turn: bool,
     pub selection: ObjectId,
+    pub make_active_agent: Option<ObjectId>,
 }
 
 impl Gui {
@@ -36,6 +37,8 @@ fn top_strip(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
                 actions.next_turn = true;
             }
             ui.label(format!("Turn Number: {}", obj.txt("turn_number")));
+            ui.separator();
+            entity_button(ui, obj.child("active_agent"), 160., actions);
         });
     });
 }
@@ -60,6 +63,12 @@ fn object_ui(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
                     ("Reign", "reign"),
                 ];
                 field_table(ui, "overview-table", &table, obj);
+
+                if obj.flag("can_make_active_agent") {
+                    if ui.small_button("Make Active Agent").clicked() {
+                        actions.make_active_agent = Some(id);
+                    }
+                }
             });
 
             if let Some(list) = obj.try_list("people_here") {
@@ -111,7 +120,7 @@ fn rows_table(
             ui.label("Empty...");
             return;
         }
-        const HEIGHT: f32 = 20.;
+        const HEIGHT: f32 = 16.;
         for row in table {
             ui.add_sized([row.width, HEIGHT], egui::Label::new(row.label));
         }
@@ -140,4 +149,23 @@ fn rows_table(
             ui.end_row();
         }
     });
+}
+
+#[inline]
+fn entity_button(
+    ui: &mut egui::Ui,
+    obj: &Object,
+    width: f32,
+    actions: &mut Actions,
+) -> egui::Response {
+    let id = obj.id("id");
+    let sense = ui
+        .add_enabled_ui(id.is_valid(), |ui| {
+            ui.add_sized([width, 14.], egui::Button::new(obj.txt("name")).small())
+        })
+        .inner;
+    if sense.clicked() {
+        actions.selection = id
+    }
+    sense
 }
