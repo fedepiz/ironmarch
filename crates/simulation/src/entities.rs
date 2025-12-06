@@ -1,13 +1,15 @@
+use std::collections::BTreeSet;
+
+use crate::agents::AgentId;
 use crate::sites::SiteId;
+
 use macros::*;
 use slotmap::*;
 use strum::{EnumCount, EnumIter, IntoEnumIterator};
 use tinybitset::TinyBitSet;
-use util::{
-    arena::{Arena, ArenaSafe},
-    misc::VecExt,
-    tagged::{TaggedCollection, Tags},
-};
+use util::arena::*;
+use util::misc::VecExt;
+use util::tagged::*;
 
 new_key_type! { pub(crate) struct EntityId; }
 
@@ -29,6 +31,8 @@ pub(crate) struct EntityData {
     pub size: f32,
     /// Set of flags
     pub flags: Flags,
+    // Agents at entity
+    pub agents: BTreeSet<AgentId>,
 }
 
 pub(crate) struct Entities {
@@ -138,6 +142,8 @@ pub(crate) enum HierarchyName {
     Capital,
     /// Links a faction to its member entities
     Faction,
+    /// Links a location to the entities therein located
+    PlaceOf,
 }
 
 #[derive(Default)]
@@ -231,6 +237,11 @@ impl Entities {
         children.sorted_insert(child);
     }
 
+    pub(crate) fn make_sibling(&mut self, rel: HierarchyName, child: EntityId, sibling: EntityId) {
+        let parent = self.entries[sibling].hierarchies.parent(rel);
+        self.set_parent(rel, child, parent);
+    }
+
     pub(crate) fn unparent(&mut self, rel: HierarchyName, child: EntityId) {
         let child_data = get_or_return!(self.get_mut(child));
 
@@ -261,12 +272,40 @@ impl Entities {
             assert!(p == parent);
         }
     }
+
+    pub(crate) fn children<'a>(
+        &'a self,
+        rel: HierarchyName,
+        parent: &'a EntityData,
+    ) -> impl Iterator<Item = &'a EntityData> + ExactSizeIterator + DoubleEndedIterator + use<'a>
+    {
+        parent
+            .hierarchies
+            .children(rel)
+            .iter()
+            .map(|&id| &self.entries[id])
+    }
+
+    pub fn children_with_flags<'a>(
+        &'a self,
+        root: &EntityData,
+        hierarchy: HierarchyName,
+        flags: &[Flag],
+    ) -> impl Iterator<Item = &'a EntityData> {
+        root.hierarchies
+            .children(hierarchy)
+            .iter()
+            .map(|&id| &self[id])
+            .filter(|entity| entity.flags.check_all(flags))
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, EnumIter, EnumCount)]
 pub(crate) enum Flag {
     IsFaction,
     IsLocation,
+    IsPerson,
+    IsPlace,
 }
 
 const FLAG_BACKING_SIZE: usize = Flag::COUNT / 8 + Flag::COUNT % 8;
@@ -280,5 +319,15 @@ impl Flags {
 
     pub fn get(&self, flag: Flag) -> bool {
         self.0[flag as usize]
+    }
+
+    pub fn set_all(&mut self, flags: &[Flag], value: bool) {
+        for &flag in flags {
+            self.set(flag, value);
+        }
+    }
+
+    pub fn check_all(&self, flags: &[Flag]) -> bool {
+        flags.iter().all(|flag| self.get(*flag))
     }
 }

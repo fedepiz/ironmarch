@@ -61,6 +61,22 @@ fn object_ui(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
                 ];
                 field_table(ui, "overview-table", &table, obj);
             });
+
+            if let Some(list) = obj.try_list("people_here") {
+                ui.heading("People Here");
+                if list.is_empty() {
+                    ui.label("...");
+                } else {
+                    egui::Grid::new("people-here-grid").show(ui, |ui| {
+                        for row in list {
+                            let btn = egui::Button::new(row.txt("name")).small();
+                            if ui.add_sized([160., 20.], btn).clicked() {
+                                actions.selection = row.id("id");
+                            }
+                        }
+                    });
+                }
+            }
         });
 }
 

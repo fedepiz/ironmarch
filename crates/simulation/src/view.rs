@@ -1,4 +1,7 @@
-use crate::entity::*;
+use std::borrow::Borrow;
+
+use crate::entities;
+use crate::entities::*;
 use crate::object::*;
 use crate::simulation::*;
 use crate::sites::Sites;
@@ -97,48 +100,86 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
 }
 
 fn extract_object(sim: &Simulation, arena: &Arena, id: ObjectId) -> Object {
-    let mut obj = Object::new();
-    obj.set("id", id);
-
     match id.0 {
-        ObjectHandle::Null => {}
+        ObjectHandle::Null => {
+            let mut obj = Object::new();
+            obj.set("id", id);
+            obj
+        }
 
         ObjectHandle::Global => {
+            let mut obj = Object::new();
+            obj.set("id", id);
             obj.set("turn_number", format!("{}", sim.turn_number));
+            obj
         }
 
         ObjectHandle::Site(_) => {
+            let mut obj = Object::new();
+            obj.set("id", id);
             obj.set("name", "Site");
             obj.set("kind", "Site");
+            obj
         }
 
         ObjectHandle::Entity(subject) => {
-            let entity = &sim.entities[subject];
-            obj.set("name", &entity.name);
-            obj.set("kind", entity.kind_name);
-
-            let faction = sim.entities[subject]
-                .hierarchies
-                .parent(HierarchyName::Faction);
-            obj.set("faction", &sim.entities[faction].name);
-
-            let root = &sim.entities[sim.entities.root_of(HierarchyName::Faction, entity.id)].name;
-            obj.set("reign", root);
-
-            obj.set(
-                "hierarchy",
-                sim.entities
-                    .ancestry(arena, HierarchyName::Faction, entity.id)
-                    .iter()
-                    .map(|&id| {
-                        let mut obj = Object::new();
-                        obj.set("name", &sim.entities[id].name);
-                        obj
-                    })
-                    .collect::<Vec<_>>(),
-            )
+            let subject = &sim.entities[subject];
+            extract_entity(sim, arena, subject)
         }
+    }
+}
+
+fn extract_entity(sim: &Simulation, arena: &Arena, subject: &EntityData) -> Object {
+    let mut obj = Object::new();
+    obj.set("id", ObjectId::entity(subject.id));
+    obj.set("name", &subject.name);
+    obj.set("kind", subject.kind_name);
+
+    let faction = subject.hierarchies.parent(HierarchyName::Faction);
+    obj.set("faction", &sim.entities[faction].name);
+
+    let root = &sim.entities[sim.entities.root_of(HierarchyName::Faction, subject.id)].name;
+    obj.set("reign", root);
+
+    obj.set(
+        "hierarchy",
+        extract_reference_list_from_ids(
+            sim,
+            sim.entities
+                .ancestry(arena, HierarchyName::Faction, subject.id),
+        ),
+    );
+
+    if subject.flags.get(Flag::IsPlace) {
+        obj.set("people_here", {
+            let list = sim.entities.children_with_flags(
+                subject,
+                HierarchyName::PlaceOf,
+                &[entities::Flag::IsPerson],
+            );
+            extract_reference_list(list)
+        });
     }
 
     obj
+}
+
+#[inline]
+fn extract_reference_list_from_ids<'a, T: Borrow<EntityId>>(
+    sim: &Simulation,
+    iter: impl IntoIterator<Item = T>,
+) -> Vec<Object> {
+    extract_reference_list(iter.into_iter().map(|id| &sim.entities[*id.borrow()]))
+}
+
+#[inline]
+fn extract_reference_list<'a>(iter: impl IntoIterator<Item = &'a EntityData>) -> Vec<Object> {
+    iter.into_iter()
+        .map(|entity| {
+            let mut obj = Object::new();
+            obj.set("id", ObjectId::entity(entity.id));
+            obj.set("name", &entity.name);
+            obj
+        })
+        .collect()
 }

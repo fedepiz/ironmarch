@@ -1,6 +1,7 @@
 use util::arena::*;
 
-use crate::entity::Entities;
+use crate::agents::Agents;
+use crate::entities::Entities;
 use crate::sites::*;
 use crate::tick::TickRequest;
 
@@ -9,6 +10,7 @@ pub struct Simulation {
     pub(crate) turn_number: usize,
     pub(crate) sites: Sites,
     pub(crate) entities: Entities,
+    pub(crate) agents: Agents,
 }
 
 impl Simulation {

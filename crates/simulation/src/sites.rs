@@ -5,7 +5,7 @@ use util::tagged::{TaggedCollection, Tags};
 
 use spatial::geom::*;
 
-use crate::entity::EntityId;
+use crate::entities::EntityId;
 
 new_key_type! { pub(crate) struct SiteId; }
 

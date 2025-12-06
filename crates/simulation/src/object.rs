@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use slotmap::Key;
 
-use crate::entity::EntityId;
+use crate::entities::EntityId;
 use crate::sites::SiteId;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -11,6 +11,10 @@ pub struct ObjectId(pub(crate) ObjectHandle);
 impl ObjectId {
     pub fn global() -> Self {
         Self(ObjectHandle::Global)
+    }
+
+    pub(crate) fn entity(id: EntityId) -> Self {
+        Self(ObjectHandle::Entity(id))
     }
 
     pub fn is_valid(self) -> bool {

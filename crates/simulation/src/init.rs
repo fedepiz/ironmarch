@@ -2,14 +2,16 @@ use macros::*;
 use slotmap::Key;
 use util::tagged::TaggedCollection;
 
-use crate::entity::*;
+use crate::entities::*;
 use crate::{simulation::*, sites::SiteData};
 
 pub(crate) fn init(sim: &mut Simulation) {
     sim.turn_number = 1;
+    init_agent_types(sim);
     init_sites(sim);
     init_factions(sim);
     init_locations(sim);
+    init_people(sim);
 }
 
 macro_rules! lookup_or_continue {
@@ -30,6 +32,23 @@ macro_rules! lookup_or_continue {
         }
         x
     }};
+}
+
+fn init_agent_types(sim: &mut Simulation) {
+    struct Desc {
+        tag: &'static str,
+        name: &'static str,
+    }
+
+    const DESCS: &[Desc] = &[Desc {
+        tag: "test_type",
+        name: "Test Agent",
+    }];
+
+    for desc in DESCS {
+        let typ = sim.agents.define_type(desc.tag);
+        typ.name = desc.name.to_string();
+    }
 }
 
 fn init_sites(sim: &mut Simulation) {
@@ -179,7 +198,7 @@ fn init_locations(sim: &mut Simulation) {
         let faction = lookup_or_continue!(sim, desc.faction, "faction");
         let site = get_or_continue!(sim.sites.lookup_data_mut(desc.site), "Unknown site");
 
-        let entity = sim.entities.spawn();
+        let entity = sim.entities.spawn_with_tag(desc.site);
         entity.name = desc.name.to_string();
 
         struct KindData {
@@ -210,7 +229,8 @@ fn init_locations(sim: &mut Simulation) {
         entity.sprite = kind.image;
         entity.size = kind.size;
 
-        entity.flags.set(Flag::IsLocation, true);
+        let flags = &[Flag::IsLocation, Flag::IsPlace];
+        entity.flags.set_all(flags, true);
 
         bind_entity_to_site(entity, site);
 
@@ -222,6 +242,36 @@ fn init_locations(sim: &mut Simulation) {
         ] {
             sim.entities.set_parent(rel, child, parent);
         }
+    }
+}
+
+fn init_people(sim: &mut Simulation) {
+    struct Desc<'a> {
+        name: &'a str,
+        location: &'a str,
+    }
+
+    const DESCS: &[Desc] = &[Desc {
+        name: "Federico",
+        location: "caer_ligualid",
+    }];
+
+    for desc in DESCS {
+        let location = lookup_or_continue!(sim, desc.location, "location");
+
+        let entity = sim.entities.spawn();
+        entity.name = desc.name.to_string();
+        entity.kind_name = "Person";
+
+        entity.flags.set(Flag::IsPerson, true);
+
+        let entity = entity.id;
+
+        sim.entities
+            .set_parent(HierarchyName::PlaceOf, entity, location);
+
+        sim.entities
+            .make_sibling(HierarchyName::Faction, entity, location);
     }
 }
 
