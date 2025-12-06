@@ -19,7 +19,8 @@ async fn amain() {
 
     let mut frame_arena = Arena::default();
 
-    let mut sim = Simulation::new();
+    let mut sim = Simulation::new(&frame_arena);
+    frame_arena.reset();
 
     let mut gui = gui::Gui::new();
     egui_macroquad::cfg(|ctx| gui.setup(ctx));
@@ -74,7 +75,9 @@ async fn amain() {
         board.draw();
         egui_macroquad::draw();
 
-        request.map_viewport = {
+        request.view.enabled = true;
+
+        request.view.map_viewport = {
             let convert = |v: mq::Vec2| V2::new(v.x, v.y);
             let top_left = convert(board.screen_to_world(mq::Vec2::ZERO));
             let bottom_right = convert(
@@ -86,7 +89,7 @@ async fn amain() {
             }
         };
 
-        request.selected_object = selected_entity;
+        request.view.selected_object = selected_entity;
 
         view = sim.tick(request, &frame_arena);
         mq::next_frame().await;

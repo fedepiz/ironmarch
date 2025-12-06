@@ -12,9 +12,9 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new() -> Simulation {
+    pub fn new(arena: &Arena) -> Simulation {
         let mut sim = Simulation::default();
-        crate::init::init(&mut sim, 2704);
+        crate::init::init(&mut sim, arena, 2704);
         sim
     }
 

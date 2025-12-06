@@ -28,7 +28,7 @@ pub(crate) struct EntityData {
     // Appearence
     pub sprite: &'static str,
     pub size: f32,
-    pub color: RGB,
+    pub color: EntityColor,
     /// Set of flags
     pub flags: Flags,
     pub links: Links,
@@ -89,19 +89,15 @@ impl Entities {
         }
     }
 
+    pub(crate) fn len(&self) -> usize {
+        self.entries.len()
+    }
+
     pub(crate) fn lookup(&self, tag: &str) -> EntityId {
         self.tags.lookup(tag).unwrap_or_default()
     }
 
-    // pub(crate) fn iter<'a>(&'a self) -> slotmap::basic::Iter<'a, EntityId, EntityData> {
-    //     self.entries.iter()
-    // }
-
-    // pub(crate) fn iter_mut<'a>(&'a mut self) -> slotmap::basic::IterMut<'a, EntityId, EntityData> {
-    //     self.entries.iter_mut()
-    // }
-
-    pub(crate) fn values<'a>(&'a self) -> slotmap::basic::Values<'a, EntityId, EntityData> {
+    pub(crate) fn iter<'a>(&'a self) -> slotmap::basic::Values<'a, EntityId, EntityData> {
         self.entries.values()
     }
 
@@ -132,6 +128,19 @@ impl<'a> TaggedCollection for &'a Entities {
     type Output = &'a EntityData;
     fn lookup(&self, tag: &str) -> Option<Self::Output> {
         self.tags.lookup(tag).map(|id| &self.entries[id])
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct EntityColor {
+    pub current: RGB,
+    pub dirty: bool,
+}
+
+impl EntityColor {
+    pub fn set(&mut self, color: RGB) {
+        self.current = color;
+        self.dirty = false;
     }
 }
 

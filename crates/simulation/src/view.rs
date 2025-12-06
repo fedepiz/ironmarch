@@ -17,11 +17,20 @@ pub struct SimView {
     pub selected: Object,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub struct RGB {
     pub r: u8,
     pub g: u8,
     pub b: u8,
+}
+impl Default for RGB {
+    fn default() -> Self {
+        RGB {
+            r: 255,
+            g: 255,
+            b: 255,
+        }
+    }
 }
 
 pub struct MapItem {
@@ -89,7 +98,7 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
         })
     });
 
-    let locations = sim.entities.values().filter_map(|entity| {
+    let locations = sim.entities.iter().filter_map(|entity| {
         let pos = sim.sites.pos_of(entity.bound_site);
         if !viewport.contains(pos) {
             return None;
@@ -97,7 +106,7 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
         Some(MapItem {
             id: ObjectId(ObjectHandle::Entity(entity.id)),
             name: entity.name.clone(),
-            color: entity.color,
+            color: entity.color.current,
             image: entity.sprite,
             pos,
             size: entity.size,

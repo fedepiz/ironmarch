@@ -2,12 +2,13 @@ use macros::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use slotmap::Key;
+use util::arena::Arena;
 use util::tagged::TaggedCollection;
 
 use crate::{RGB, entities::*};
 use crate::{simulation::*, sites::SiteData};
 
-pub(crate) fn init(sim: &mut Simulation, seed: u64) {
+pub(crate) fn init(sim: &mut Simulation, arena: &Arena, seed: u64) {
     let rng = &mut SmallRng::seed_from_u64(seed);
     sim.turn_number = 1;
     init_cultures(sim);
@@ -15,6 +16,8 @@ pub(crate) fn init(sim: &mut Simulation, seed: u64) {
     init_factions(sim, rng);
     init_locations(sim);
     init_people(sim, rng);
+
+    sim.tick(crate::TickRequest::default(), arena);
 }
 
 macro_rules! lookup_or_continue {
@@ -213,12 +216,12 @@ fn init_factions(sim: &mut Simulation, rng: &mut SmallRng) {
         entity.kind_name = "Faction";
         entity.flags.set(Flag::IsFaction, true);
 
-        entity.color = if desc.color == (0, 0, 0) {
+        entity.color.set(if desc.color == (0, 0, 0) {
             random_color(rng)
         } else {
             let (r, g, b) = desc.color;
             RGB { r, g, b }
-        };
+        });
     }
 
     for desc in DESCS {
@@ -273,8 +276,6 @@ fn init_locations(sim: &mut Simulation) {
         let culture = lookup_or_continue!(sim, desc.culture, "culture");
         let site = get_or_continue!(sim.sites.lookup_data_mut(desc.site), "Unknown site");
 
-        let color = sim.entities[faction].color;
-
         let entity = sim.entities.spawn_with_tag(desc.site);
         entity.name = desc.name.to_string();
 
@@ -305,7 +306,7 @@ fn init_locations(sim: &mut Simulation) {
         entity.kind_name = kind.name;
         entity.sprite = kind.image;
         entity.size = kind.size;
-        entity.color = color;
+        entity.color.dirty = true;
 
         let flags = &[Flag::IsLocation, Flag::IsPlace];
         entity.flags.set_all(flags, true);
