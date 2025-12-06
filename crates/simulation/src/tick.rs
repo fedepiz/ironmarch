@@ -1,9 +1,9 @@
+use spatial::geom::Extents;
 use util::arena::Arena;
 
 use crate::object::*;
 use crate::simulation::*;
 use crate::view;
-use spatial::geom::Extents;
 
 #[derive(Default)]
 pub struct TickRequest {

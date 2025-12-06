@@ -63,19 +63,17 @@ fn object_ui(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
             });
 
             if let Some(list) = obj.try_list("people_here") {
+                ui.separator();
                 ui.heading("People Here");
-                if list.is_empty() {
-                    ui.label("...");
-                } else {
-                    egui::Grid::new("people-here-grid").show(ui, |ui| {
-                        for row in list {
-                            let btn = egui::Button::new(row.txt("name")).small();
-                            if ui.add_sized([160., 20.], btn).clicked() {
-                                actions.selection = row.id("id");
-                            }
-                        }
-                    });
-                }
+                let rows = [Row {
+                    label: "Name",
+                    primary: "name",
+                    id: "id",
+                    width: 160.,
+                    ..Default::default()
+                }];
+
+                rows_table(ui, "people-here-grid", &rows, list, actions);
             }
         });
 }
@@ -92,26 +90,45 @@ fn field_table(ui: &mut egui::Ui, grid_id: &str, table: &[(&str, &str)], obj: &O
     });
 }
 
+#[derive(Default)]
 struct Row<'a> {
+    id: &'a str,
     label: &'a str,
     primary: &'a str,
     tooltip: &'a [(&'a str, &'a str)],
+    width: f32,
 }
 
-fn rows_table(ui: &mut egui::Ui, grid_id: &str, table: &[Row], list: &[Object]) {
+fn rows_table(
+    ui: &mut egui::Ui,
+    grid_id: &str,
+    table: &[Row],
+    list: &[Object],
+    actions: &mut Actions,
+) {
     egui::Grid::new(grid_id).striped(true).show(ui, |ui| {
         if list.is_empty() {
             ui.label("Empty...");
             return;
         }
+        const HEIGHT: f32 = 20.;
         for row in table {
-            ui.label(row.label);
+            ui.add_sized([row.width, HEIGHT], egui::Label::new(row.label));
         }
         ui.end_row();
         for obj in list {
             for row in table {
                 let primary = obj.txt(row.primary);
-                let response = ui.label(primary);
+                let response = if row.id.is_empty() {
+                    ui.label(primary)
+                } else {
+                    let sense =
+                        ui.add_sized([row.width, HEIGHT], egui::Button::new(primary).small());
+                    if sense.clicked() {
+                        actions.selection = obj.id(row.id);
+                    }
+                    sense
+                };
                 if !row.tooltip.is_empty() {
                     response.on_hover_ui(|ui| {
                         ui.heading(format!("{} {}", row.label, primary));

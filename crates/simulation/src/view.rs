@@ -1,13 +1,13 @@
+use slotmap::Key;
+use spatial::geom::*;
 use std::borrow::Borrow;
+use util::arena::Arena;
 
 use crate::entities;
 use crate::entities::*;
 use crate::object::*;
 use crate::simulation::*;
 use crate::sites::Sites;
-use slotmap::Key;
-use spatial::geom::*;
-use util::arena::Arena;
 
 #[derive(Default)]
 pub struct SimView {
@@ -17,10 +17,17 @@ pub struct SimView {
     pub selected: Object,
 }
 
+#[derive(Clone, Copy, Default)]
+pub struct RGB {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
 pub struct MapItem {
     pub id: ObjectId,
     pub name: String,
-    pub color: bool,
+    pub color: RGB,
     pub image: &'static str,
     pub pos: V2,
     pub size: f32,
@@ -70,7 +77,11 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
         Some(MapItem {
             id: ObjectId(ObjectHandle::Site(site.id)),
             name: String::default(),
-            color: false,
+            color: RGB {
+                r: 130,
+                g: 130,
+                b: 130,
+            },
             image: "",
             pos,
             size: 1.,
@@ -86,7 +97,7 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
         Some(MapItem {
             id: ObjectId(ObjectHandle::Entity(entity.id)),
             name: entity.name.clone(),
-            color: true,
+            color: entity.color,
             image: entity.sprite,
             pos,
             size: entity.size,

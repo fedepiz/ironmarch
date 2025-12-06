@@ -1,15 +1,14 @@
-use std::collections::BTreeSet;
-
-use crate::agents::AgentId;
-use crate::sites::SiteId;
-
 use macros::*;
+use rand::rngs::SmallRng;
 use slotmap::*;
 use strum::{EnumCount, EnumIter, IntoEnumIterator};
 use tinybitset::TinyBitSet;
 use util::arena::*;
 use util::misc::VecExt;
 use util::tagged::*;
+
+use crate::RGB;
+use crate::sites::SiteId;
 
 new_key_type! { pub(crate) struct EntityId; }
 
@@ -29,10 +28,11 @@ pub(crate) struct EntityData {
     // Appearence
     pub sprite: &'static str,
     pub size: f32,
+    pub color: RGB,
     /// Set of flags
     pub flags: Flags,
-    // Agents at entity
-    pub agents: BTreeSet<AgentId>,
+    pub links: Links,
+    pub name_lists: Option<Box<NameLists>>,
 }
 
 pub(crate) struct Entities {
@@ -313,21 +313,72 @@ const FLAG_BACKING_SIZE: usize = Flag::COUNT / 8 + Flag::COUNT % 8;
 pub(crate) struct Flags(TinyBitSet<u8, FLAG_BACKING_SIZE>);
 
 impl Flags {
+    #[inline]
     pub fn set(&mut self, flag: Flag, value: bool) {
         self.0.assign(flag as usize, value);
     }
 
+    #[inline]
     pub fn get(&self, flag: Flag) -> bool {
         self.0[flag as usize]
     }
 
+    #[inline]
     pub fn set_all(&mut self, flags: &[Flag], value: bool) {
         for &flag in flags {
             self.set(flag, value);
         }
     }
 
+    #[inline]
     pub fn check_all(&self, flags: &[Flag]) -> bool {
         flags.iter().all(|flag| self.get(*flag))
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, EnumIter, EnumCount)]
+pub(crate) enum LinkName {
+    Culture,
+}
+
+#[derive(Default)]
+pub(crate) struct Links([EntityId; LinkName::COUNT]);
+
+impl Links {
+    #[inline]
+    pub fn get(&self, link: LinkName) -> EntityId {
+        self.0[link as usize]
+    }
+
+    #[inline]
+    pub fn set(&mut self, link: LinkName, entity: EntityId) {
+        self.0[link as usize] = entity;
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, EnumIter, EnumCount)]
+pub(crate) enum NameList {
+    PersonalNames,
+}
+
+#[derive(Default)]
+pub(crate) struct NameLists(pub [Vec<String>; NameList::COUNT]);
+
+impl NameLists {
+    #[inline]
+    pub fn get(&self, list: NameList) -> &[String] {
+        &self.0[list as usize]
+    }
+
+    #[inline]
+    pub fn with(mut self, list: NameList, value: Vec<String>) -> Self {
+        self.0[list as usize] = value;
+        self
+    }
+
+    pub fn pick_randomly(&self, list: NameList, rng: &mut SmallRng) -> &str {
+        let list = self.get(list);
+        let picked = rand::seq::SliceRandom::choose(list, rng);
+        picked.map(|x| x.as_str()).unwrap_or("NONAME")
     }
 }

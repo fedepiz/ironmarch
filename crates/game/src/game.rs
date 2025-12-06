@@ -112,14 +112,7 @@ fn populate_board(board: &mut board::Board, view: &SimView, selected_entity: Obj
 
         let is_big = item.size > 1.;
 
-        let fill_color = if !item.color {
-            mq::GRAY
-        } else if is_big {
-            mq::GREEN
-        } else {
-            mq::SKYBLUE
-        };
-
+        let fill_color = mq::Color::from_rgba(item.color.r, item.color.g, item.color.b, 255);
         let (border_color, text_color) = if is_selected {
             (mq::YELLOW, mq::YELLOW)
         } else {

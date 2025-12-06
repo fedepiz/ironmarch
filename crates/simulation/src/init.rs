@@ -1,17 +1,20 @@
 use macros::*;
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 use slotmap::Key;
 use util::tagged::TaggedCollection;
 
-use crate::entities::*;
+use crate::{RGB, entities::*};
 use crate::{simulation::*, sites::SiteData};
 
-pub(crate) fn init(sim: &mut Simulation) {
+pub(crate) fn init(sim: &mut Simulation, seed: u64) {
+    let rng = &mut SmallRng::seed_from_u64(seed);
     sim.turn_number = 1;
-    init_agent_types(sim);
+    init_cultures(sim);
     init_sites(sim);
-    init_factions(sim);
+    init_factions(sim, rng);
     init_locations(sim);
-    init_people(sim);
+    init_people(sim, rng);
 }
 
 macro_rules! lookup_or_continue {
@@ -34,20 +37,77 @@ macro_rules! lookup_or_continue {
     }};
 }
 
-fn init_agent_types(sim: &mut Simulation) {
-    struct Desc {
-        tag: &'static str,
-        name: &'static str,
+fn init_cultures(sim: &mut Simulation) {
+    struct Desc<'a> {
+        tag: &'a str,
+        name: &'a str,
+        names: &'a [&'a str],
     }
 
-    const DESCS: &[Desc] = &[Desc {
-        tag: "test_type",
-        name: "Test Agent",
+    const DESC: &[Desc] = &[Desc {
+        tag: "anglish",
+        name: "Anglish",
+        names: &[
+            "Alden",
+            "Aldwin",
+            "Alfred",
+            "Athelstan",
+            "Bede",
+            "Brand",
+            "Cerdic",
+            "Cuthbert",
+            "Dunstan",
+            "Eadwig",
+            "Earl",
+            "Edgar",
+            "Edmund",
+            "Edward",
+            "Edwin",
+            "Egbert",
+            "Eldred",
+            "Elmer",
+            "Ethelbert",
+            "Ethelwulf",
+            "Godric",
+            "Godwin",
+            "Grim",
+            "Harold",
+            "Hereward",
+            "Kenelm",
+            "Leofric",
+            "Leofwin",
+            "Offa",
+            "Osbert",
+            "Osborn",
+            "Osmund",
+            "Oswald",
+            "Oswin",
+            "Redwald",
+            "Sigebert",
+            "Siward",
+            "Stigand",
+            "Thurston",
+            "Wada",
+            "Wilfred",
+            "Wulfric",
+            "Wulfstan",
+            "Wynstan",
+        ],
     }];
 
-    for desc in DESCS {
-        let typ = sim.agents.define_type(desc.tag);
-        typ.name = desc.name.to_string();
+    for desc in DESC {
+        let entity = sim.entities.spawn_with_tag(desc.tag);
+        entity.name = desc.name.to_string();
+        entity.kind_name = "Culture";
+
+        entity.name_lists = {
+            let name_lists = NameLists::default().with(
+                NameList::PersonalNames,
+                desc.names.iter().map(|x| x.to_string()).collect(),
+            );
+
+            Some(Box::new(name_lists))
+        };
     }
 }
 
@@ -124,11 +184,12 @@ fn init_sites(sim: &mut Simulation) {
     }
 }
 
-fn init_factions(sim: &mut Simulation) {
+fn init_factions(sim: &mut Simulation, rng: &mut SmallRng) {
     struct Desc {
         tag: &'static str,
         name: &'static str,
         parent: &'static str,
+        color: (u8, u8, u8),
     }
 
     const DESCS: &[Desc] = &[
@@ -136,11 +197,13 @@ fn init_factions(sim: &mut Simulation) {
             tag: "rheged",
             name: "Rheged",
             parent: "",
+            color: (200, 40, 30),
         },
         Desc {
             tag: "clan_drust",
             name: "Clan Drust",
             parent: "rheged",
+            color: (0, 0, 0),
         },
     ];
 
@@ -149,6 +212,13 @@ fn init_factions(sim: &mut Simulation) {
         entity.name = desc.name.to_string();
         entity.kind_name = "Faction";
         entity.flags.set(Flag::IsFaction, true);
+
+        entity.color = if desc.color == (0, 0, 0) {
+            random_color(rng)
+        } else {
+            let (r, g, b) = desc.color;
+            RGB { r, g, b }
+        };
     }
 
     for desc in DESCS {
@@ -163,6 +233,7 @@ fn init_locations(sim: &mut Simulation) {
     struct Desc {
         name: &'static str,
         site: &'static str,
+        culture: &'static str,
         kind: Kind,
         faction: &'static str,
     }
@@ -177,18 +248,21 @@ fn init_locations(sim: &mut Simulation) {
         Desc {
             name: "Caer Ligualid",
             site: "caer_ligualid",
+            culture: "anglish",
             kind: Kind::Town,
             faction: "rheged",
         },
         Desc {
             name: "Anava",
             site: "anava",
+            culture: "anglish",
             kind: Kind::Village,
             faction: "rheged",
         },
         Desc {
             name: "Din Drust",
             site: "din_drust",
+            culture: "anglish",
             kind: Kind::Hillfort,
             faction: "clan_drust",
         },
@@ -196,7 +270,10 @@ fn init_locations(sim: &mut Simulation) {
 
     for desc in DESCS {
         let faction = lookup_or_continue!(sim, desc.faction, "faction");
+        let culture = lookup_or_continue!(sim, desc.culture, "culture");
         let site = get_or_continue!(sim.sites.lookup_data_mut(desc.site), "Unknown site");
+
+        let color = sim.entities[faction].color;
 
         let entity = sim.entities.spawn_with_tag(desc.site);
         entity.name = desc.name.to_string();
@@ -228,9 +305,12 @@ fn init_locations(sim: &mut Simulation) {
         entity.kind_name = kind.name;
         entity.sprite = kind.image;
         entity.size = kind.size;
+        entity.color = color;
 
         let flags = &[Flag::IsLocation, Flag::IsPlace];
         entity.flags.set_all(flags, true);
+
+        entity.links.set(LinkName::Culture, culture);
 
         bind_entity_to_site(entity, site);
 
@@ -245,40 +325,99 @@ fn init_locations(sim: &mut Simulation) {
     }
 }
 
-fn init_people(sim: &mut Simulation) {
-    struct Desc<'a> {
-        name: &'a str,
-        location: &'a str,
-    }
-
-    const DESCS: &[Desc] = &[Desc {
-        name: "Federico",
-        location: "caer_ligualid",
-    }];
-
-    for desc in DESCS {
-        let location = lookup_or_continue!(sim, desc.location, "location");
-
-        let entity = sim.entities.spawn();
-        entity.name = desc.name.to_string();
-        entity.kind_name = "Person";
-
-        entity.flags.set(Flag::IsPerson, true);
-
-        let entity = entity.id;
-
-        sim.entities
-            .set_parent(HierarchyName::PlaceOf, entity, location);
-
-        sim.entities
-            .make_sibling(HierarchyName::Faction, entity, location);
-    }
-}
-
 #[inline]
 fn bind_entity_to_site(entity: &mut EntityData, site: &mut SiteData) {
     assert!(entity.bound_site.is_null());
     assert!(site.bound_entity.is_null());
     entity.bound_site = site.id;
     site.bound_entity = entity.id;
+}
+
+fn init_people(sim: &mut Simulation, rng: &mut SmallRng) {
+    struct Desc<'a> {
+        name: &'a str,
+        location: &'a str,
+        culture: &'a str,
+        repeats: usize,
+    }
+
+    const DESCS: &[Desc] = &[Desc {
+        name: "",
+        location: "caer_ligualid",
+        culture: "",
+        repeats: 4,
+    }];
+
+    let mut spawns = vec![];
+
+    for desc in DESCS {
+        for _ in 0..desc.repeats {
+            let location = lookup_or_continue!(sim, desc.location, "location");
+            let culture = if desc.culture.is_empty() {
+                EntityId::null()
+            } else {
+                lookup_or_continue!(sim, desc.culture, "culture")
+            };
+            spawns.push(SpawnPerson {
+                name: desc.name.to_string(),
+                location,
+                culture,
+            });
+        }
+    }
+
+    for info in spawns {
+        spawn_person(sim, info, rng);
+    }
+}
+
+#[derive(Default)]
+struct SpawnPerson {
+    name: String,
+    location: EntityId,
+    culture: EntityId,
+}
+
+fn spawn_person(sim: &mut Simulation, info: SpawnPerson, rng: &mut SmallRng) -> EntityId {
+    let culture = if info.culture.is_null() {
+        sim.entities[info.location].links.get(LinkName::Culture)
+    } else {
+        info.culture
+    };
+
+    let name = if info.name.is_empty() {
+        let name_list = sim.entities[culture].name_lists.as_ref();
+        name_list
+            .map(|nm| nm.pick_randomly(NameList::PersonalNames, rng))
+            .unwrap()
+            .to_string()
+    } else {
+        info.name.to_string()
+    };
+
+    let entity = sim.entities.spawn();
+    entity.name = name;
+    entity.kind_name = "Person";
+
+    entity.flags.set(Flag::IsPerson, true);
+
+    entity.links.set(LinkName::Culture, culture);
+
+    let entity = entity.id;
+
+    sim.entities
+        .set_parent(HierarchyName::PlaceOf, entity, info.location);
+
+    sim.entities
+        .make_sibling(HierarchyName::Faction, entity, info.location);
+
+    entity
+}
+
+fn random_color(rng: &mut SmallRng) -> RGB {
+    RGB {
+        r: rng.gen_range(u8::MIN..=u8::MAX),
+        g: rng.gen_range(u8::MIN..=u8::MAX),
+        b: rng.gen_range(u8::MIN..=u8::MAX),
+    }
 }

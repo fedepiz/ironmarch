@@ -1,7 +1,6 @@
 mod simulation;
 pub use simulation::Simulation;
 
-mod agents;
 mod entities;
 
 mod object;

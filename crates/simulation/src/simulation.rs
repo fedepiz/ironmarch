@@ -1,6 +1,5 @@
 use util::arena::*;
 
-use crate::agents::Agents;
 use crate::entities::Entities;
 use crate::sites::*;
 use crate::tick::TickRequest;
@@ -10,13 +9,12 @@ pub struct Simulation {
     pub(crate) turn_number: usize,
     pub(crate) sites: Sites,
     pub(crate) entities: Entities,
-    pub(crate) agents: Agents,
 }
 
 impl Simulation {
     pub fn new() -> Simulation {
         let mut sim = Simulation::default();
-        crate::init::init(&mut sim);
+        crate::init::init(&mut sim, 2704);
         sim
     }
 
