@@ -43,13 +43,13 @@ pub(crate) struct Entities {
 }
 
 impl Entities {
-    pub(crate) fn new() -> Self {
-        Self::default()
-    }
+    // pub(crate) fn new() -> Self {
+    //     Self::default()
+    // }
 
-    pub(crate) fn spawn(&mut self) -> &mut EntityData {
-        self.spawn_with_tag("")
-    }
+    // pub(crate) fn spawn(&mut self) -> &mut EntityData {
+    //     self.spawn_with_tag("")
+    // }
 
     pub(crate) fn spawn_with_tag(&mut self, tag: &str) -> &mut EntityData {
         let id = self.entries.insert(EntityData::default());
@@ -122,13 +122,6 @@ impl<'a> TaggedCollection for &'a Entities {
 pub(crate) struct EntityColor {
     pub current: RGB,
     pub dirty: bool,
-}
-
-impl EntityColor {
-    pub fn set(&mut self, color: RGB) {
-        self.current = color;
-        self.dirty = false;
-    }
 }
 
 // Parent-child relationships
@@ -300,6 +293,7 @@ impl Entities {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, EnumIter, EnumCount)]
 pub(crate) enum Flag {
+    IsCard,
     IsFaction,
     IsLocation,
     IsPerson,

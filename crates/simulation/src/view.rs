@@ -197,6 +197,15 @@ fn extract_entity(sim: &Simulation, arena: &Arena, subject: &EntityData) -> Obje
                 );
                 extract_reference_list(list)
             });
+
+            obj.set("cards_here", {
+                let list = sim.entities.children_with_flags(
+                    subject,
+                    HierarchyName::PlaceOf,
+                    &[entities::Flag::IsCard],
+                );
+                extract_reference_list(list)
+            });
         }
     }
 

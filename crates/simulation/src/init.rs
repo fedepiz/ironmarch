@@ -15,8 +15,9 @@ pub(crate) fn init(sim: &mut Simulation, arena: &Arena, seed: u64) {
     init_cultures(sim);
     init_sites(sim);
     init_factions(sim, arena, rng);
-    init_locations(sim, arena, rng);
-    init_people(sim, arena, rng);
+    let init_locations = init_locations(sim, arena, rng);
+    init_people(sim, arena, &init_locations.create_people, rng);
+    init_cards(sim, arena, rng);
 
     sim.tick(crate::TickRequest::default(), arena);
 }
@@ -209,7 +210,14 @@ fn init_factions(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
     }
 }
 
-fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
+#[derive(Default)]
+struct InitLocations {
+    create_people: Vec<CreatePeople>,
+}
+
+fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) -> InitLocations {
+    let mut out = InitLocations::default();
+
     struct Desc {
         name: &'static str,
         site: &'static str,
@@ -255,6 +263,8 @@ fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
         },
     ];
 
+    out.create_people.reserve(DESCS.len());
+
     for desc in DESCS {
         let faction = lookup_or_continue!(sim, desc.faction, "faction");
         let culture = lookup_or_continue!(sim, desc.culture, "culture");
@@ -264,6 +274,7 @@ fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
             name: &'static str,
             image: &'static str,
             size: f32,
+            create_n_people: usize,
         }
 
         let kind = match desc.kind {
@@ -271,16 +282,19 @@ fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
                 name: "Town",
                 image: "town",
                 size: 2.,
+                create_n_people: 5,
             },
             Kind::Village => KindData {
                 name: "Village",
                 image: "village",
                 size: 1.4,
+                create_n_people: 3,
             },
             Kind::Hillfort => KindData {
                 name: "Hillfort",
                 image: "hillfort",
                 size: 1.75,
+                create_n_people: 3,
             },
         };
 
@@ -299,8 +313,13 @@ fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
             parents: &[(HierarchyName::Faction, faction)],
             children: &[(HierarchyName::Capital, faction)],
         };
-        spawn_entity(sim, info, rng);
+        let location = spawn_entity(sim, info, rng);
+        out.create_people.push(CreatePeople {
+            location,
+            num_people: kind.create_n_people,
+        });
     }
+    out
 }
 
 #[inline]
@@ -311,43 +330,16 @@ fn bind_entity_to_site(entity: &mut EntityData, site: &mut SiteData) {
     site.bound_entity = entity.id;
 }
 
-fn init_people(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
-    // #[derive(Default)]
-    // struct Desc<'a> {
-    //     name: &'a str,
-    //     location: &'a str,
-    //     culture: &'a str,
-    //     faction: &'a str,
-    //     repeats: usize,
-    // }
+struct CreatePeople {
+    location: EntityId,
+    num_people: usize,
+}
 
-    // let descs = [Desc {
-    //     location: "caer_ligualid",
-    //     repeats: 4,
-    //     ..Default::default()
-    // }];
-
-    // For each location, generate 5 characters of that culture
-
-    struct Create {
-        location: EntityId,
-        repeats: usize,
-    }
-
-    let creates: Vec<_> = sim
-        .entities
-        .iter()
-        .filter(|entity| entity.flags.get(Flag::IsLocation))
-        .map(|location| Create {
-            location: location.id,
-            repeats: 5,
-        })
-        .collect();
-
+fn init_people(sim: &mut Simulation, arena: &Arena, sources: &[CreatePeople], rng: &mut SmallRng) {
     let mut spawns = vec![];
 
-    for desc in creates {
-        for _ in 0..desc.repeats {
+    for desc in sources {
+        for _ in 0..desc.num_people {
             let location = &sim.entities[desc.location];
             let culture = location.links.get(LinkName::Culture);
             let faction = location.hierarchies.parent(HierarchyName::Faction);
@@ -418,7 +410,7 @@ struct SpawnEntity<'a> {
     children: &'a [(HierarchyName, EntityId)],
 }
 
-fn spawn_entity(sim: &mut Simulation, info: SpawnEntity, rng: &mut SmallRng) {
+fn spawn_entity(sim: &mut Simulation, info: SpawnEntity, rng: &mut SmallRng) -> EntityId {
     let name = match info.name {
         SpawnName::Fixed(x) => x.to_string(),
         SpawnName::FromList(source, list) => sim.entities[source]
@@ -461,8 +453,35 @@ fn spawn_entity(sim: &mut Simulation, info: SpawnEntity, rng: &mut SmallRng) {
     for &(rel, parent) in info.parents {
         sim.entities.set_parent(rel, entity, parent);
     }
+
     for &(rel, child) in info.children {
         sim.entities.set_parent(rel, child, entity);
+    }
+
+    entity
+}
+
+fn init_cards(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
+    struct Desc {
+        name: &'static str,
+        location: &'static str,
+    }
+
+    const DESCS: &[Desc] = &[Desc {
+        name: "Bonheddwr",
+        location: "caer_ligualid",
+    }];
+
+    for desc in DESCS {
+        let location = lookup_or_continue!(sim, desc.location, "location");
+
+        let info = SpawnEntity {
+            name: SpawnName::Fixed(desc.name),
+            parents: arena.alloc_slice([(HierarchyName::PlaceOf, location)]),
+            flags: &[Flag::IsCard],
+            ..Default::default()
+        };
+        spawn_entity(sim, info, rng);
     }
 }
 

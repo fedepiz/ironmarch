@@ -82,7 +82,21 @@ fn object_ui(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
                     ..Default::default()
                 }];
 
-                rows_table(ui, "people-here-grid", &rows, list, actions);
+                rows_table(ui, "people-here-grid", &rows, list, actions, 80.);
+            }
+
+            if let Some(list) = obj.try_list("cards_here") {
+                ui.separator();
+                ui.heading("Cards Here");
+                let rows = [Row {
+                    label: "Name",
+                    primary: "name",
+                    id: "id",
+                    width: 160.,
+                    ..Default::default()
+                }];
+
+                rows_table(ui, "cards-here-grid", &rows, list, actions, 80.);
             }
         });
 }
@@ -114,41 +128,56 @@ fn rows_table(
     table: &[Row],
     list: &[Object],
     actions: &mut Actions,
+    height: f32,
 ) {
-    egui::Grid::new(grid_id).striped(true).show(ui, |ui| {
-        if list.is_empty() {
-            ui.label("Empty...");
-            return;
-        }
-        const HEIGHT: f32 = 16.;
-        for row in table {
-            ui.add_sized([row.width, HEIGHT], egui::Label::new(row.label));
-        }
-        ui.end_row();
-        for obj in list {
+    const ROW_HEIGHT: f32 = 16.;
+
+    if list.is_empty() {
+        ui.label("Empty...");
+        return;
+    }
+    egui::Grid::new(&format!("{}_heading", grid_id))
+        .striped(true)
+        .show(ui, |ui| {
             for row in table {
-                let primary = obj.txt(row.primary);
-                let response = if row.id.is_empty() {
-                    ui.label(primary)
-                } else {
-                    let sense =
-                        ui.add_sized([row.width, HEIGHT], egui::Button::new(primary).small());
-                    if sense.clicked() {
-                        actions.selection = obj.id(row.id);
-                    }
-                    sense
-                };
-                if !row.tooltip.is_empty() {
-                    response.on_hover_ui(|ui| {
-                        ui.heading(format!("{} {}", row.label, primary));
-                        ui.separator();
-                        field_table(ui, "hover-grid", row.tooltip, obj);
-                    });
-                }
+                ui.add_sized([row.width, ROW_HEIGHT], egui::Label::new(row.label));
             }
-            ui.end_row();
-        }
-    });
+        });
+
+    egui::ScrollArea::vertical()
+        .id_salt(&format!("{}_scroll", grid_id))
+        .max_height(height)
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+        .show(ui, |ui| {
+            ui.set_min_height(height);
+            egui::Grid::new(grid_id).striped(true).show(ui, |ui| {
+                for obj in list {
+                    for row in table {
+                        let primary = obj.txt(row.primary);
+                        let response = if row.id.is_empty() {
+                            ui.label(primary)
+                        } else {
+                            let sense = ui.add_sized(
+                                [row.width, ROW_HEIGHT],
+                                egui::Button::new(primary).small(),
+                            );
+                            if sense.clicked() {
+                                actions.selection = obj.id(row.id);
+                            }
+                            sense
+                        };
+                        if !row.tooltip.is_empty() {
+                            response.on_hover_ui(|ui| {
+                                ui.heading(format!("{} {}", row.label, primary));
+                                ui.separator();
+                                field_table(ui, "hover-grid", row.tooltip, obj);
+                            });
+                        }
+                    }
+                    ui.end_row();
+                }
+            });
+        });
 }
 
 #[inline]
