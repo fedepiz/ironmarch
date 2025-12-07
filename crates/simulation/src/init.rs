@@ -208,6 +208,12 @@ fn init_factions(sim: &mut Simulation, rng: &mut SmallRng) {
             parent: "rheged",
             color: (0, 0, 0),
         },
+        Desc {
+            tag: "clan_heledd",
+            name: "Clan Heledd",
+            parent: "rheged",
+            color: (0, 0, 0),
+        },
     ];
 
     for desc in DESCS {
@@ -269,6 +275,13 @@ fn init_locations(sim: &mut Simulation) {
             kind: Kind::Hillfort,
             faction: "clan_drust",
         },
+        Desc {
+            name: "Llan Heledd",
+            site: "llan_heledd",
+            culture: "anglish",
+            kind: Kind::Village,
+            faction: "clan_heledd",
+        },
     ];
 
     for desc in DESCS {
@@ -317,12 +330,10 @@ fn init_locations(sim: &mut Simulation) {
 
         let entity = entity.id;
 
-        for (rel, child, parent) in [
-            (HierarchyName::Faction, entity, faction),
-            (HierarchyName::Capital, entity, faction),
-        ] {
-            sim.entities.set_parent(rel, child, parent);
-        }
+        sim.entities
+            .set_parent(HierarchyName::Faction, entity, faction);
+        sim.entities
+            .set_parent(HierarchyName::Capital, faction, entity);
     }
 }
 
@@ -335,23 +346,24 @@ fn bind_entity_to_site(entity: &mut EntityData, site: &mut SiteData) {
 }
 
 fn init_people(sim: &mut Simulation, rng: &mut SmallRng) {
+    #[derive(Default)]
     struct Desc<'a> {
         name: &'a str,
         location: &'a str,
         culture: &'a str,
+        faction: &'a str,
         repeats: usize,
     }
 
-    const DESCS: &[Desc] = &[Desc {
-        name: "",
+    let descs = [Desc {
         location: "caer_ligualid",
-        culture: "",
         repeats: 4,
+        ..Default::default()
     }];
 
     let mut spawns = vec![];
 
-    for desc in DESCS {
+    for desc in descs {
         for _ in 0..desc.repeats {
             let location = lookup_or_continue!(sim, desc.location, "location");
             let culture = if desc.culture.is_empty() {
@@ -359,9 +371,17 @@ fn init_people(sim: &mut Simulation, rng: &mut SmallRng) {
             } else {
                 lookup_or_continue!(sim, desc.culture, "culture")
             };
+
+            let faction = if desc.faction.is_empty() {
+                EntityId::null()
+            } else {
+                lookup_or_continue!(sim, desc.culture, "faction")
+            };
+
             spawns.push(SpawnPerson {
                 name: desc.name.to_string(),
                 location,
+                faction,
                 culture,
             });
         }
@@ -377,13 +397,23 @@ struct SpawnPerson {
     name: String,
     location: EntityId,
     culture: EntityId,
+    faction: EntityId,
 }
 
 fn spawn_person(sim: &mut Simulation, info: SpawnPerson, rng: &mut SmallRng) -> EntityId {
+    let location = info.location;
     let culture = if info.culture.is_null() {
-        sim.entities[info.location].links.get(LinkName::Culture)
+        sim.entities[location].links.get(LinkName::Culture)
     } else {
         info.culture
+    };
+
+    let faction = if info.faction.is_null() {
+        sim.entities[location]
+            .hierarchies
+            .parent(HierarchyName::Faction)
+    } else {
+        info.faction
     };
 
     let name = if info.name.is_empty() {
@@ -407,10 +437,10 @@ fn spawn_person(sim: &mut Simulation, info: SpawnPerson, rng: &mut SmallRng) -> 
     let entity = entity.id;
 
     sim.entities
-        .set_parent(HierarchyName::PlaceOf, entity, info.location);
+        .set_parent(HierarchyName::PlaceOf, entity, location);
 
     sim.entities
-        .make_sibling(HierarchyName::Faction, entity, info.location);
+        .set_parent(HierarchyName::Faction, entity, faction);
 
     entity
 }

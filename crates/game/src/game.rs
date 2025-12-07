@@ -43,8 +43,10 @@ async fn amain() {
         let mut is_keyboard_taken_by_ui = false;
         egui_macroquad::ui(|ctx| {
             let actions = gui.tick(ctx, &view.root, &view.selected);
+            // Request transferral
             request.end_turn = actions.next_turn;
             request.make_active = actions.make_active_agent;
+
             selected_entity = actions.selection;
 
             is_mouse_over_ui = ctx.wants_pointer_input();
