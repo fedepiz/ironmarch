@@ -142,6 +142,8 @@ pub(crate) enum HierarchyName {
     PlaceOf,
 }
 
+impl ArenaSafe for HierarchyName {}
+
 #[derive(Default)]
 pub(crate) struct HierarchyLink {
     pub parent: EntityId,

@@ -20,6 +20,14 @@ impl Arena {
         self.0.alloc_str(source)
     }
 
+    pub fn alloc_slice<'a, T, I>(&'a self, source: I) -> &'a [T]
+    where
+        I: IntoIterator<Item = T>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        self.0.alloc_slice_fill_iter(source)
+    }
+
     pub fn reset(&mut self) {
         self.0.reset();
     }
