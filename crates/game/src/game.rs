@@ -26,10 +26,7 @@ async fn amain() {
     egui_macroquad::cfg(|ctx| gui.setup(ctx));
 
     let mut board = board::Board::new(20., &assets);
-    let mut selected_entity = ObjectId::default();
-
     let mut view = simulation::SimView::default();
-    // Pre-records the kind of windows the matching requested objects are
 
     loop {
         frame_arena.reset();
@@ -42,23 +39,29 @@ async fn amain() {
         let mut is_mouse_over_ui = false;
         let mut is_keyboard_taken_by_ui = false;
         egui_macroquad::ui(|ctx| {
-            let actions = gui.tick(ctx, &view.root, &view.selected);
+            let outputs = {
+                let objects = gui::Objects {
+                    root: &view.root,
+                    selected: &view.selected,
+                };
+                gui.tick(ctx, objects)
+            };
             // Request transferral
-            request.end_turn = actions.next_turn;
-            request.make_active = actions.make_active_agent;
+            request.end_turn = outputs.next_turn;
+            request.make_active = outputs.make_active_agent;
 
-            selected_entity = actions.selection;
+            request.interacted_with_object = outputs.selection;
 
             is_mouse_over_ui = ctx.wants_pointer_input();
             is_keyboard_taken_by_ui = ctx.wants_keyboard_input();
         });
 
         let map_item_ids: Vec<_> = view.map_items.iter().map(|x| x.id).collect();
-        populate_board(&mut board, &view, selected_entity);
+        populate_board(&mut board, &view);
 
         if !is_mouse_over_ui {
             if mq::is_mouse_button_pressed(mq::MouseButton::Left) {
-                selected_entity = board
+                request.interacted_with_object = board
                     .hovered()
                     .and_then(|handle| map_item_ids.get(handle.0))
                     .copied()
@@ -92,14 +95,12 @@ async fn amain() {
             }
         };
 
-        request.view.selected_object = selected_entity;
-
         view = sim.tick(request, &frame_arena);
         mq::next_frame().await;
     }
 }
 
-fn populate_board(board: &mut board::Board, view: &SimView, selected_entity: ObjectId) {
+fn populate_board(board: &mut board::Board, view: &SimView) {
     board.clear();
     let mut ids = Vec::with_capacity(view.map_items.len());
     // Lines
@@ -114,18 +115,16 @@ fn populate_board(board: &mut board::Board, view: &SimView, selected_entity: Obj
         let handle = board::Handle(ids.len());
         ids.push(item.id);
 
-        let is_selected = item.id == selected_entity;
-
         let is_big = item.size > 1.;
 
         let fill_color = mq::Color::from_rgba(item.color.r, item.color.g, item.color.b, 255);
-        let (border_color, text_color) = if is_selected {
+        let (border_color, text_color) = if item.highlight {
             (mq::YELLOW, mq::YELLOW)
         } else {
             (mq::BLACK, mq::WHITE)
         };
 
-        let show_name = is_selected || is_big;
+        let show_name = item.highlight || is_big;
         let name = if show_name { item.name.as_str() } else { "" };
         let pos = mq::Vec2::new(item.pos.x, item.pos.y);
 

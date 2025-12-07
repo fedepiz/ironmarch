@@ -1,10 +1,17 @@
+use core::f32;
+
 use simulation::{Object, ObjectId};
 
 #[derive(Default)]
 pub(crate) struct Gui {}
 
+pub(crate) struct Objects<'a> {
+    pub root: &'a Object,
+    pub selected: &'a Object,
+}
+
 #[derive(Default)]
-pub(crate) struct Actions {
+pub(crate) struct Outputs {
     pub next_turn: bool,
     pub selection: ObjectId,
     pub make_active_agent: Option<ObjectId>,
@@ -19,31 +26,34 @@ impl Gui {
         ctx.set_pixels_per_point(1.6);
     }
 
-    pub fn tick(&mut self, ctx: &egui::Context, root: &Object, selected: &Object) -> Actions {
-        let mut actions = Actions::default();
-        actions.selection = selected.id("id");
+    pub fn tick(&mut self, ctx: &egui::Context, objects: Objects) -> Outputs {
+        let mut outputs = Outputs::default();
+        outputs.selection = objects.selected.id("id");
 
-        top_strip(ctx, root, &mut actions);
+        top_strip(ctx, objects.root, &mut outputs);
+        object_ui(ctx, objects.selected, &mut outputs);
 
-        object_ui(ctx, selected, &mut actions);
-        actions
+        if let Some(list) = objects.root.try_list("actions") {
+            actions_ui(ctx, list, &mut outputs);
+        }
+        outputs
     }
 }
 
-fn top_strip(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
+fn top_strip(ctx: &egui::Context, obj: &Object, outputs: &mut Outputs) {
     egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
         ui.horizontal_centered(|ui| {
             if ui.small_button("Next Turn").clicked() {
-                actions.next_turn = true;
+                outputs.next_turn = true;
             }
             ui.label(format!("Turn Number: {}", obj.txt("turn_number")));
             ui.separator();
-            entity_button(ui, obj.child("active_agent"), 160., actions);
+            entity_button(ui, obj.child("active_agent"), 160., outputs);
         });
     });
 }
 
-fn object_ui(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
+fn object_ui(ctx: &egui::Context, obj: &Object, outputs: &mut Outputs) {
     let id = obj.id("id");
     if !id.is_valid() {
         return;
@@ -66,7 +76,7 @@ fn object_ui(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
 
                 if obj.flag("can_make_active_agent") {
                     if ui.small_button("Make Active Agent").clicked() {
-                        actions.make_active_agent = Some(id);
+                        outputs.make_active_agent = Some(id);
                     }
                 }
             });
@@ -82,7 +92,7 @@ fn object_ui(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
                     ..Default::default()
                 }];
 
-                rows_table(ui, "people-here-grid", &rows, list, actions, 80.);
+                rows_table(ui, "people-here-grid", &rows, list, outputs, 80.);
             }
 
             if let Some(list) = obj.try_list("cards_here") {
@@ -96,8 +106,24 @@ fn object_ui(ctx: &egui::Context, obj: &Object, actions: &mut Actions) {
                     ..Default::default()
                 }];
 
-                rows_table(ui, "cards-here-grid", &rows, list, actions, 80.);
+                rows_table(ui, "cards-here-grid", &rows, list, outputs, 80.);
             }
+        });
+}
+
+fn actions_ui(ctx: &egui::Context, list: &[Object], outputs: &mut Outputs) {
+    egui::Window::new("Actions")
+        .collapsible(false)
+        .resizable(false)
+        .show(ctx, |ui| {
+            let table = &[Row {
+                id: "id",
+                label: "Name",
+                primary: "name",
+                tooltip: &[],
+                width: 120.,
+            }];
+            rows_table(ui, "actions-grid", table, list, outputs, f32::INFINITY);
         });
 }
 
@@ -127,9 +153,10 @@ fn rows_table(
     grid_id: &str,
     table: &[Row],
     list: &[Object],
-    actions: &mut Actions,
+    outputs: &mut Outputs,
     height: f32,
 ) {
+    const IDX_WIDTH: f32 = 10.;
     const ROW_HEIGHT: f32 = 16.;
 
     if list.is_empty() {
@@ -138,7 +165,9 @@ fn rows_table(
     }
     egui::Grid::new(&format!("{}_heading", grid_id))
         .striped(true)
+        .min_col_width(IDX_WIDTH)
         .show(ui, |ui| {
+            ui.add_sized([IDX_WIDTH, ROW_HEIGHT], egui::Label::new(""));
             for row in table {
                 ui.add_sized([row.width, ROW_HEIGHT], egui::Label::new(row.label));
             }
@@ -149,34 +178,43 @@ fn rows_table(
         .max_height(height)
         .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
         .show(ui, |ui| {
-            ui.set_min_height(height);
-            egui::Grid::new(grid_id).striped(true).show(ui, |ui| {
-                for obj in list {
-                    for row in table {
-                        let primary = obj.txt(row.primary);
-                        let response = if row.id.is_empty() {
-                            ui.label(primary)
-                        } else {
-                            let sense = ui.add_sized(
-                                [row.width, ROW_HEIGHT],
-                                egui::Button::new(primary).small(),
-                            );
-                            if sense.clicked() {
-                                actions.selection = obj.id(row.id);
+            if height != f32::INFINITY {
+                ui.set_min_height(height);
+            }
+            egui::Grid::new(grid_id)
+                .striped(true)
+                .min_col_width(IDX_WIDTH)
+                .show(ui, |ui| {
+                    for (idx, obj) in list.iter().enumerate() {
+                        ui.add_sized(
+                            [IDX_WIDTH, ROW_HEIGHT],
+                            egui::Label::new(format!("{}", idx + 1)),
+                        );
+                        for row in table {
+                            let primary = obj.txt(row.primary);
+                            let response = if row.id.is_empty() {
+                                ui.label(primary)
+                            } else {
+                                let sense = ui.add_sized(
+                                    [row.width, ROW_HEIGHT],
+                                    egui::Button::new(primary).small(),
+                                );
+                                if sense.clicked() {
+                                    outputs.selection = obj.id(row.id);
+                                }
+                                sense
+                            };
+                            if !row.tooltip.is_empty() {
+                                response.on_hover_ui(|ui| {
+                                    ui.heading(format!("{} {}", row.label, primary));
+                                    ui.separator();
+                                    field_table(ui, "hover-grid", row.tooltip, obj);
+                                });
                             }
-                            sense
-                        };
-                        if !row.tooltip.is_empty() {
-                            response.on_hover_ui(|ui| {
-                                ui.heading(format!("{} {}", row.label, primary));
-                                ui.separator();
-                                field_table(ui, "hover-grid", row.tooltip, obj);
-                            });
                         }
+                        ui.end_row();
                     }
-                    ui.end_row();
-                }
-            });
+                });
         });
 }
 
@@ -185,7 +223,7 @@ fn entity_button(
     ui: &mut egui::Ui,
     obj: &Object,
     width: f32,
-    actions: &mut Actions,
+    outputs: &mut Outputs,
 ) -> egui::Response {
     let id = obj.id("id");
     let sense = ui
@@ -194,7 +232,7 @@ fn entity_button(
         })
         .inner;
     if sense.clicked() {
-        actions.selection = id
+        outputs.selection = id
     }
     sense
 }

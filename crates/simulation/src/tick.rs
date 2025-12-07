@@ -1,3 +1,4 @@
+use slotmap::Key;
 use spatial::geom::Extents;
 use util::arena::Arena;
 
@@ -11,13 +12,13 @@ pub struct TickRequest {
     pub view: ViewRequest,
     pub end_turn: bool,
     pub make_active: Option<ObjectId>,
+    pub interacted_with_object: ObjectId,
 }
 
 #[derive(Default)]
 pub struct ViewRequest {
     pub enabled: bool,
     pub map_viewport: Extents,
-    pub selected_object: ObjectId,
 }
 
 pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) -> view::SimView {
@@ -31,6 +32,10 @@ pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) ->
         .unwrap_or(sim.active_agent);
 
     refresh_colours(sim);
+    refresh_available_actions(sim);
+
+    // Update interaction
+    handle_interaction(sim, request.interacted_with_object);
 
     // Extract view
     if request.view.enabled {
@@ -38,10 +43,35 @@ pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) ->
             sim,
             arena,
             request.view.map_viewport,
-            request.view.selected_object,
+            sim.interaction.selected_entity,
         )
     } else {
         view::SimView::default()
+    }
+}
+
+fn handle_interaction(sim: &mut Simulation, interacted_with: ObjectId) {
+    // Update interaction
+    match interacted_with.0 {
+        ObjectHandle::Entity(id) => {
+            sim.interaction.selected_entity = id;
+        }
+        ObjectHandle::AvailableAction(idx) => {
+            let action = &sim.available_actions[idx];
+            println!("Performing action {}", action.name);
+        }
+        _ => {}
+    };
+}
+
+fn refresh_available_actions(sim: &mut Simulation) {
+    let actions = &mut sim.available_actions;
+    actions.has_any = !sim.active_agent.is_null();
+    actions.list.clear();
+    if actions.has_any {
+        actions.list.push(Action {
+            name: "Test Action",
+        });
     }
 }
 

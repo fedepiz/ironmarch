@@ -23,6 +23,7 @@ pub struct RGB {
     pub g: u8,
     pub b: u8,
 }
+
 impl Default for RGB {
     fn default() -> Self {
         RGB {
@@ -41,20 +42,23 @@ pub struct MapItem {
     pub pos: V2,
     pub size: f32,
     pub layer: u8,
+    pub highlight: bool,
 }
 
 pub(super) fn extract(
     sim: &Simulation,
     arena: &Arena,
     viewport: Extents,
-    selected: ObjectId,
+    selected: EntityId,
 ) -> SimView {
     let mut view = SimView::default();
     view.map_items = map_view_items(sim, viewport);
     view.map_lines = map_view_lines(&sim.sites, viewport);
 
     view.root = extract_object(sim, arena, ObjectId::global());
-    view.selected = extract_object(sim, arena, selected);
+
+    let selected = &sim.entities[selected];
+    view.selected = extract_entity(sim, arena, selected);
 
     view
 }
@@ -95,6 +99,7 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
             pos,
             size: 1.,
             layer: 0,
+            highlight: false,
         })
     });
 
@@ -103,6 +108,7 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
         if !viewport.contains(pos) {
             return None;
         }
+        let highlight = entity.id == sim.interaction.selected_entity;
         Some(MapItem {
             id: ObjectId(ObjectHandle::Entity(entity.id)),
             name: entity.name.clone(),
@@ -111,6 +117,7 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
             pos,
             size: entity.size,
             layer: 1,
+            highlight,
         })
     });
 
@@ -121,12 +128,6 @@ fn map_view_items(sim: &Simulation, viewport: Extents) -> Vec<MapItem> {
 
 fn extract_object(sim: &Simulation, arena: &Arena, id: ObjectId) -> Object {
     match id.0 {
-        ObjectHandle::Null => {
-            let mut obj = Object::new();
-            obj.set("id", id);
-            obj
-        }
-
         ObjectHandle::Global => {
             let mut obj = Object::new();
             obj.set("id", id);
@@ -135,6 +136,23 @@ fn extract_object(sim: &Simulation, arena: &Arena, id: ObjectId) -> Object {
                 "active_agent",
                 extract_entity(sim, arena, &sim.entities[sim.active_agent]),
             );
+
+            if sim.available_actions.has_any {
+                obj.set(
+                    "actions",
+                    sim.available_actions
+                        .list
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, action)| {
+                            let mut obj = Object::new();
+                            obj.set("id", ObjectId(ObjectHandle::AvailableAction(idx)));
+                            obj.set("name", action.name);
+                            obj
+                        })
+                        .collect::<Vec<_>>(),
+                );
+            }
             obj
         }
 
@@ -149,6 +167,12 @@ fn extract_object(sim: &Simulation, arena: &Arena, id: ObjectId) -> Object {
         ObjectHandle::Entity(subject) => {
             let subject = &sim.entities[subject];
             extract_entity(sim, arena, subject)
+        }
+
+        _ => {
+            let mut obj = Object::new();
+            obj.set("id", id);
+            obj
         }
     }
 }
@@ -169,10 +193,14 @@ fn extract_entity(sim: &Simulation, arena: &Arena, subject: &EntityData) -> Obje
         obj.set("kind", subject.kind_name);
 
         let faction = subject.hierarchies.parent(HierarchyName::Faction);
-        obj.set("faction", &sim.entities[faction].name);
+        if !faction.is_null() {
+            obj.set("faction", &sim.entities[faction].name);
+        }
 
-        let root = &sim.entities[sim.entities.root_of(HierarchyName::Faction, subject.id)].name;
-        obj.set("reign", root);
+        let reign = sim.entities.root_of(HierarchyName::Faction, subject.id);
+        if !reign.is_null() {
+            obj.set("reign", &sim.entities[reign].name);
+        }
 
         obj.set(
             "hierarchy",

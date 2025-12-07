@@ -39,6 +39,7 @@ pub(crate) enum ObjectHandle {
     Global,
     Site(SiteId),
     Entity(EntityId),
+    AvailableAction(usize),
 }
 
 impl Default for ObjectHandle {

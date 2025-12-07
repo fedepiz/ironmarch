@@ -477,6 +477,7 @@ fn init_cards(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
 
         let info = SpawnEntity {
             name: SpawnName::Fixed(desc.name),
+            kind: "Card",
             parents: arena.alloc_slice([(HierarchyName::PlaceOf, location)]),
             flags: &[Flag::IsCard],
             ..Default::default()
