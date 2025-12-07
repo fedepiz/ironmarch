@@ -48,56 +48,18 @@ fn init_cultures(sim: &mut Simulation) {
         names: &'a [&'a str],
     }
 
-    const DESC: &[Desc] = &[Desc {
-        tag: "anglish",
-        name: "Anglish",
-        names: &[
-            "Alden",
-            "Aldwin",
-            "Alfred",
-            "Athelstan",
-            "Bede",
-            "Brand",
-            "Cerdic",
-            "Cuthbert",
-            "Dunstan",
-            "Eadwig",
-            "Earl",
-            "Edgar",
-            "Edmund",
-            "Edward",
-            "Edwin",
-            "Egbert",
-            "Eldred",
-            "Elmer",
-            "Ethelbert",
-            "Ethelwulf",
-            "Godric",
-            "Godwin",
-            "Grim",
-            "Harold",
-            "Hereward",
-            "Kenelm",
-            "Leofric",
-            "Leofwin",
-            "Offa",
-            "Osbert",
-            "Osborn",
-            "Osmund",
-            "Oswald",
-            "Oswin",
-            "Redwald",
-            "Sigebert",
-            "Siward",
-            "Stigand",
-            "Thurston",
-            "Wada",
-            "Wilfred",
-            "Wulfric",
-            "Wulfstan",
-            "Wynstan",
-        ],
-    }];
+    const DESC: &[Desc] = &[
+        Desc {
+            tag: "anglish",
+            name: "Anglish",
+            names: crate::names::ANGLO_SAXON_MALE_NAMES,
+        },
+        Desc {
+            tag: "brythonic",
+            name: "Brythonic",
+            names: crate::names::BRYTHONIC_MALE_NAMES,
+        },
+    ];
 
     for desc in DESC {
         let entity = sim.entities.spawn_with_tag(desc.tag);
@@ -266,28 +228,28 @@ fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
         Desc {
             name: "Caer Ligualid",
             site: "caer_ligualid",
-            culture: "anglish",
+            culture: "brythonic",
             kind: Kind::Town,
             faction: "rheged",
         },
         Desc {
             name: "Anava",
             site: "anava",
-            culture: "anglish",
+            culture: "brythonic",
             kind: Kind::Village,
             faction: "rheged",
         },
         Desc {
             name: "Din Drust",
             site: "din_drust",
-            culture: "anglish",
+            culture: "brythonic",
             kind: Kind::Hillfort,
             faction: "clan_drust",
         },
         Desc {
             name: "Llan Heledd",
             site: "llan_heledd",
-            culture: "anglish",
+            culture: "brythonic",
             kind: Kind::Village,
             faction: "clan_heledd",
         },
@@ -350,47 +312,51 @@ fn bind_entity_to_site(entity: &mut EntityData, site: &mut SiteData) {
 }
 
 fn init_people(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
-    #[derive(Default)]
-    struct Desc<'a> {
-        name: &'a str,
-        location: &'a str,
-        culture: &'a str,
-        faction: &'a str,
+    // #[derive(Default)]
+    // struct Desc<'a> {
+    //     name: &'a str,
+    //     location: &'a str,
+    //     culture: &'a str,
+    //     faction: &'a str,
+    //     repeats: usize,
+    // }
+
+    // let descs = [Desc {
+    //     location: "caer_ligualid",
+    //     repeats: 4,
+    //     ..Default::default()
+    // }];
+
+    // For each location, generate 5 characters of that culture
+
+    struct Create {
+        location: EntityId,
         repeats: usize,
     }
 
-    let descs = [Desc {
-        location: "caer_ligualid",
-        repeats: 4,
-        ..Default::default()
-    }];
+    let creates: Vec<_> = sim
+        .entities
+        .iter()
+        .filter(|entity| entity.flags.get(Flag::IsLocation))
+        .map(|location| Create {
+            location: location.id,
+            repeats: 5,
+        })
+        .collect();
 
     let mut spawns = vec![];
 
-    for desc in descs {
+    for desc in creates {
         for _ in 0..desc.repeats {
-            let location = lookup_or_continue!(sim, desc.location, "location");
-            let culture = if desc.culture.is_empty() {
-                sim.entities[location].links.get(LinkName::Culture)
-            } else {
-                lookup_or_continue!(sim, desc.culture, "culture")
-            };
+            let location = &sim.entities[desc.location];
+            let culture = location.links.get(LinkName::Culture);
+            let faction = location.hierarchies.parent(HierarchyName::Faction);
 
-            let faction = if desc.faction.is_empty() {
-                sim.entities[location]
-                    .hierarchies
-                    .parent(HierarchyName::Faction)
-            } else {
-                lookup_or_continue!(sim, desc.culture, "faction")
-            };
+            let location = location.id;
+            let name = SpawnName::FromList(culture, NameList::PersonalNames);
 
             spawns.push(SpawnEntity {
-                tag: "",
-                name: if desc.name.is_empty() {
-                    SpawnName::FromList(culture, NameList::PersonalNames)
-                } else {
-                    SpawnName::Fixed(desc.name)
-                },
+                name,
                 kind: "Person",
                 looks: SpawnLooks::default(),
                 site: Default::default(),
@@ -401,6 +367,7 @@ fn init_people(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
                     (HierarchyName::Faction, faction),
                 ]),
                 children: &[],
+                ..Default::default()
             });
         }
     }
