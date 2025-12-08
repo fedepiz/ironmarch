@@ -1,3 +1,4 @@
+use strum::{EnumCount, EnumIter};
 use util::arena::*;
 
 use crate::entities::{Entities, EntityId};
@@ -33,7 +34,19 @@ pub(crate) struct Interaction {
 }
 
 pub(crate) struct Action {
+    pub kind: ActionKind,
     pub name: &'static str,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, EnumIter, EnumCount)]
+pub(crate) enum ActionKind {
+    Null,
+}
+
+impl Default for ActionKind {
+    fn default() -> Self {
+        ActionKind::Null
+    }
 }
 
 pub(crate) struct AvailableActions {
@@ -48,6 +61,7 @@ impl Default for AvailableActions {
             has_any: false,
             list: vec![],
             dummy: Action {
+                kind: ActionKind::default(),
                 name: "Dummy Action",
             },
         }

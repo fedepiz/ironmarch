@@ -13,7 +13,7 @@ pub(crate) struct Objects<'a> {
 #[derive(Default)]
 pub(crate) struct Outputs {
     pub next_turn: bool,
-    pub selection: ObjectId,
+    pub interacted: Option<ObjectId>,
     pub make_active_agent: Option<ObjectId>,
 }
 
@@ -28,7 +28,7 @@ impl Gui {
 
     pub fn tick(&mut self, ctx: &egui::Context, objects: Objects) -> Outputs {
         let mut outputs = Outputs::default();
-        outputs.selection = objects.selected.id("id");
+        outputs.interacted = None;
 
         top_strip(ctx, objects.root, &mut outputs);
         object_ui(ctx, objects.selected, &mut outputs);
@@ -200,7 +200,7 @@ fn rows_table(
                                     egui::Button::new(primary).small(),
                                 );
                                 if sense.clicked() {
-                                    outputs.selection = obj.id(row.id);
+                                    outputs.interacted = Some(obj.id(row.id));
                                 }
                                 sense
                             };
@@ -232,7 +232,7 @@ fn entity_button(
         })
         .inner;
     if sense.clicked() {
-        outputs.selection = id
+        outputs.interacted = Some(id)
     }
     sense
 }

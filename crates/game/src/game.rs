@@ -50,7 +50,7 @@ async fn amain() {
             request.end_turn = outputs.next_turn;
             request.make_active = outputs.make_active_agent;
 
-            request.interacted_with_object = outputs.selection;
+            request.interacted_with_object = outputs.interacted;
 
             is_mouse_over_ui = ctx.wants_pointer_input();
             is_keyboard_taken_by_ui = ctx.wants_keyboard_input();
@@ -61,11 +61,13 @@ async fn amain() {
 
         if !is_mouse_over_ui {
             if mq::is_mouse_button_pressed(mq::MouseButton::Left) {
-                request.interacted_with_object = board
-                    .hovered()
-                    .and_then(|handle| map_item_ids.get(handle.0))
-                    .copied()
-                    .unwrap_or_default();
+                request.interacted_with_object = Some(
+                    board
+                        .hovered()
+                        .and_then(|handle| map_item_ids.get(handle.0))
+                        .copied()
+                        .unwrap_or_default(),
+                );
             }
         }
 

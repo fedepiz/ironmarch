@@ -12,7 +12,7 @@ pub struct TickRequest {
     pub view: ViewRequest,
     pub end_turn: bool,
     pub make_active: Option<ObjectId>,
-    pub interacted_with_object: ObjectId,
+    pub interacted_with_object: Option<ObjectId>,
 }
 
 #[derive(Default)]
@@ -32,10 +32,12 @@ pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) ->
         .unwrap_or(sim.active_agent);
 
     refresh_colours(sim);
-    refresh_available_actions(sim);
+    determine_available_actions(sim);
 
     // Update interaction
-    handle_interaction(sim, request.interacted_with_object);
+    if let Some(object) = request.interacted_with_object {
+        handle_interaction(sim, object);
+    }
 
     // Extract view
     if request.view.enabled {
@@ -53,6 +55,7 @@ pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) ->
 fn handle_interaction(sim: &mut Simulation, interacted_with: ObjectId) {
     // Update interaction
     match interacted_with.0 {
+        ObjectHandle::Null => sim.interaction.selected_entity = EntityId::null(),
         ObjectHandle::Entity(id) => {
             sim.interaction.selected_entity = id;
         }
@@ -64,15 +67,29 @@ fn handle_interaction(sim: &mut Simulation, interacted_with: ObjectId) {
     };
 }
 
-fn refresh_available_actions(sim: &mut Simulation) {
-    let actions = &mut sim.available_actions;
-    actions.has_any = !sim.active_agent.is_null();
+fn determine_available_actions(sim: &mut Simulation) {
+    let subject = &sim.entities[sim.active_agent];
+    let target = &sim.entities[sim.interaction.selected_entity];
+
+    let mut actions = std::mem::take(&mut sim.available_actions);
+    let has_subject_and_object = !subject.id.is_null() && !target.id.is_null();
+    actions.has_any = has_subject_and_object;
     actions.list.clear();
-    if actions.has_any {
+
+    if has_subject_and_object {
         actions.list.push(Action {
+            kind: ActionKind::Null,
             name: "Test Action",
         });
+
+        if target.flags.get(Flag::IsPerson) {
+            actions.list.push(Action {
+                kind: ActionKind::Null,
+                name: "Kiss",
+            });
+        }
     }
+    sim.available_actions = actions;
 }
 
 fn refresh_colours(sim: &mut Simulation) {
