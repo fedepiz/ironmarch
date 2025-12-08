@@ -33,6 +33,7 @@ pub(crate) struct Prototype {
     pub kind: &'static str,
     pub flags: &'static [Flag],
     pub has_location: bool,
+    pub has_faction: bool,
 }
 
 impl std::ops::Index<PrototypeId> for Prototypes {
@@ -58,6 +59,7 @@ impl TaggedCollection for Prototypes {
 pub(crate) struct PrototypeArgs {
     pub tag: &'static str,
     pub location: EntityId,
+    pub faction: EntityId,
 }
 
 impl Prototype {
@@ -73,6 +75,11 @@ impl Prototype {
         if self.has_location {
             assert!(!args.location.is_null());
             parents.push((HierarchyName::PlaceOf, args.location));
+        }
+
+        if self.has_faction {
+            assert!(!args.faction.is_null());
+            parents.push((HierarchyName::Faction, args.faction));
         }
 
         let spawn = SpawnEntity {

@@ -13,6 +13,7 @@ pub(crate) fn init(sim: &mut Simulation, arena: &Arena, seed: u64) {
     let rng = &mut SmallRng::seed_from_u64(seed);
     sim.turn_number = 1;
     init_cultures(sim);
+    init_prototypes(sim);
     init_sites(sim);
     init_factions(sim, arena, rng);
     let init_locations = init_locations(sim, arena, rng);
@@ -76,6 +77,19 @@ fn init_cultures(sim: &mut Simulation) {
             Some(Box::new(name_lists))
         };
     }
+}
+
+fn init_prototypes(sim: &mut Simulation) {
+    sim.prototypes.define(
+        "bonheddwr",
+        spawn::Prototype {
+            name: "Bonheddwr",
+            kind: "Card",
+            flags: &[Flag::IsCard],
+            has_location: true,
+            has_faction: false,
+        },
+    );
 }
 
 fn init_sites(sim: &mut Simulation) {
@@ -362,16 +376,6 @@ fn init_people(sim: &mut Simulation, arena: &Arena, sources: &[CreatePeople], rn
 }
 
 fn init_cards(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
-    sim.prototypes.define(
-        "bonheddwr",
-        spawn::Prototype {
-            name: "Bonheddwr",
-            kind: "Card",
-            flags: &[Flag::IsCard],
-            has_location: true,
-        },
-    );
-
     struct Desc {
         prototype: &'static str,
         location: &'static str,
