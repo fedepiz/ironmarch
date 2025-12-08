@@ -1,10 +1,14 @@
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 use slotmap::Key;
 use spatial::geom::Extents;
 use util::arena::Arena;
+use util::tagged::TaggedCollection;
 
 use crate::entities::*;
 use crate::object::*;
 use crate::simulation::*;
+use crate::spawn::PrototypeArgs;
 use crate::view;
 
 #[derive(Default)]
@@ -36,7 +40,7 @@ pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) ->
 
     // Update interaction
     if let Some(object) = request.interacted_with_object {
-        handle_interaction(sim, object);
+        handle_interaction(sim, arena, object);
     }
 
     // Extract view
@@ -52,7 +56,13 @@ pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) ->
     }
 }
 
-fn handle_interaction(sim: &mut Simulation, interacted_with: ObjectId) {
+fn handle_interaction(sim: &mut Simulation, arena: &Arena, interacted_with: ObjectId) {
+    let available_actions = std::mem::take(&mut sim.available_actions);
+
+    let rng = &mut {
+        let seed = (sim.turn_number as u64).wrapping_mul(13).wrapping_add(2732);
+        SmallRng::seed_from_u64(seed)
+    };
     // Update interaction
     match interacted_with.0 {
         ObjectHandle::Null => sim.interaction.selected_entity = EntityId::null(),
@@ -60,8 +70,12 @@ fn handle_interaction(sim: &mut Simulation, interacted_with: ObjectId) {
             sim.interaction.selected_entity = id;
         }
         ObjectHandle::AvailableAction(idx) => {
-            let action = &sim.available_actions[idx];
+            let action = available_actions.list.into_iter().nth(idx).unwrap();
+
             println!("Performing action {}", action.name);
+            if let Some((proto, args)) = action.spawn_prototype.as_ref() {
+                proto.spawn(sim, arena, rng, args);
+            }
         }
         _ => {}
     };
@@ -78,15 +92,28 @@ fn determine_available_actions(sim: &mut Simulation) {
 
     if has_subject_and_object {
         actions.list.push(Action {
-            kind: ActionKind::Null,
             name: "Test Action",
+            ..Default::default()
         });
 
         if target.flags.get(Flag::IsPerson) {
             actions.list.push(Action {
-                kind: ActionKind::Null,
                 name: "Kiss",
+                ..Default::default()
             });
+        }
+
+        if target.flags.get(Flag::IsLocation) {
+            let prototype = sim.prototypes.lookup("bonheddwr").unwrap_or_default();
+            let args = PrototypeArgs {
+                location: target.id,
+                ..Default::default()
+            };
+
+            actions.list.push(Action {
+                name: "Recruit",
+                spawn_prototype: Some((prototype, args)),
+            })
         }
     }
     sim.available_actions = actions;

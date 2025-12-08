@@ -1,8 +1,8 @@
-use strum::{EnumCount, EnumIter};
 use util::arena::*;
 
 use crate::entities::{Entities, EntityId};
 use crate::sites::*;
+use crate::spawn::*;
 use crate::tick::TickRequest;
 
 #[derive(Default)]
@@ -11,6 +11,7 @@ pub struct Simulation {
     pub(crate) interaction: Interaction,
     pub(crate) sites: Sites,
     pub(crate) entities: Entities,
+    pub(crate) prototypes: Prototypes,
     pub(crate) active_agent: EntityId,
     pub(crate) available_actions: AvailableActions,
 }
@@ -33,20 +34,10 @@ pub(crate) struct Interaction {
     pub selected_entity: EntityId,
 }
 
+#[derive(Default)]
 pub(crate) struct Action {
-    pub kind: ActionKind,
     pub name: &'static str,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, EnumIter, EnumCount)]
-pub(crate) enum ActionKind {
-    Null,
-}
-
-impl Default for ActionKind {
-    fn default() -> Self {
-        ActionKind::Null
-    }
+    pub spawn_prototype: Option<(Prototype, PrototypeArgs)>,
 }
 
 pub(crate) struct AvailableActions {
@@ -61,8 +52,8 @@ impl Default for AvailableActions {
             has_any: false,
             list: vec![],
             dummy: Action {
-                kind: ActionKind::default(),
                 name: "Dummy Action",
+                ..Default::default()
             },
         }
     }

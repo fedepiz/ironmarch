@@ -5,9 +5,9 @@ use slotmap::Key;
 use util::arena::Arena;
 use util::tagged::TaggedCollection;
 
-use crate::sites::SiteId;
+use crate::simulation::*;
+use crate::spawn::{self, SpawnEntity};
 use crate::{RGB, entities::*};
-use crate::{simulation::*, sites::SiteData};
 
 pub(crate) fn init(sim: &mut Simulation, arena: &Arena, seed: u64) {
     let rng = &mut SmallRng::seed_from_u64(seed);
@@ -194,19 +194,19 @@ fn init_factions(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
             lookup_or_continue!(sim, desc.parent)
         };
 
-        let info = SpawnEntity {
+        let info = spawn::SpawnEntity {
             tag: desc.tag,
-            name: SpawnName::Fixed(desc.name),
+            name: spawn::Name::Fixed(desc.name),
             kind: "Faction",
-            looks: SpawnLooks {
-                color: SpawnColor::Fixed(color),
+            looks: spawn::Looks {
+                color: spawn::Color::Fixed(color),
                 ..Default::default()
             },
             flags: &[Flag::IsFaction],
             parents: arena.alloc_slice([(HierarchyName::Faction, parent)]),
             ..Default::default()
         };
-        spawn_entity(sim, info, rng);
+        info.spawn(sim, rng);
     }
 }
 
@@ -300,12 +300,12 @@ fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) -> In
 
         let info = SpawnEntity {
             tag: desc.site,
-            name: SpawnName::Fixed(desc.name),
+            name: spawn::Name::Fixed(desc.name),
             kind: kind.name,
-            looks: SpawnLooks {
+            looks: spawn::Looks {
                 sprite: kind.image,
                 size: kind.size,
-                color: SpawnColor::Dynamic,
+                color: spawn::Color::Dynamic,
             },
             site,
             flags: &[Flag::IsLocation, Flag::IsPlace],
@@ -313,21 +313,13 @@ fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) -> In
             parents: &[(HierarchyName::Faction, faction)],
             children: &[(HierarchyName::Capital, faction)],
         };
-        let location = spawn_entity(sim, info, rng);
+        let location = info.spawn(sim, rng);
         out.create_people.push(CreatePeople {
             location,
             num_people: kind.create_n_people,
         });
     }
     out
-}
-
-#[inline]
-fn bind_entity_to_site(entity: &mut EntityData, site: &mut SiteData) {
-    assert!(entity.bound_site.is_null());
-    assert!(site.bound_entity.is_null());
-    entity.bound_site = site.id;
-    site.bound_entity = entity.id;
 }
 
 struct CreatePeople {
@@ -345,12 +337,12 @@ fn init_people(sim: &mut Simulation, arena: &Arena, sources: &[CreatePeople], rn
             let faction = location.hierarchies.parent(HierarchyName::Faction);
 
             let location = location.id;
-            let name = SpawnName::FromList(culture, NameList::PersonalNames);
+            let name = spawn::Name::FromList(culture, NameList::PersonalNames);
 
             spawns.push(SpawnEntity {
                 name,
                 kind: "Person",
-                looks: SpawnLooks::default(),
+                looks: spawn::Looks::default(),
                 site: Default::default(),
                 flags: &[Flag::IsPerson],
                 links: arena.alloc_slice([(LinkName::Culture, culture)]),
@@ -364,125 +356,47 @@ fn init_people(sim: &mut Simulation, arena: &Arena, sources: &[CreatePeople], rn
         }
     }
 
-    for info in spawns {
-        spawn_entity(sim, info, rng);
+    for spawn in spawns {
+        spawn.spawn(sim, rng);
     }
-}
-
-enum SpawnName<'a> {
-    Fixed(&'a str),
-    FromList(EntityId, NameList),
-}
-impl Default for SpawnName<'_> {
-    fn default() -> Self {
-        Self::Fixed("")
-    }
-}
-
-#[derive(Default)]
-struct SpawnLooks {
-    sprite: &'static str,
-    size: f32,
-    color: SpawnColor,
-}
-
-enum SpawnColor {
-    Fixed(RGB),
-    Dynamic,
-}
-
-impl Default for SpawnColor {
-    fn default() -> Self {
-        Self::Fixed(Default::default())
-    }
-}
-
-#[derive(Default)]
-struct SpawnEntity<'a> {
-    tag: &'a str,
-    name: SpawnName<'a>,
-    kind: &'static str,
-    looks: SpawnLooks,
-    site: SiteId,
-    flags: &'a [Flag],
-    links: &'a [(LinkName, EntityId)],
-    parents: &'a [(HierarchyName, EntityId)],
-    children: &'a [(HierarchyName, EntityId)],
-}
-
-fn spawn_entity(sim: &mut Simulation, info: SpawnEntity, rng: &mut SmallRng) -> EntityId {
-    let name = match info.name {
-        SpawnName::Fixed(x) => x.to_string(),
-        SpawnName::FromList(source, list) => sim.entities[source]
-            .name_lists
-            .as_ref()
-            .unwrap()
-            .pick_randomly(list, rng)
-            .to_string(),
-    };
-
-    let entity = sim.entities.spawn_with_tag(info.tag);
-    entity.name = name;
-    entity.kind_name = info.kind;
-
-    entity.sprite = info.looks.sprite;
-    entity.size = info.looks.size;
-    entity.color = match info.looks.color {
-        SpawnColor::Fixed(rgb) => EntityColor {
-            current: rgb,
-            dirty: false,
-        },
-        SpawnColor::Dynamic => EntityColor {
-            current: Default::default(),
-            dirty: true,
-        },
-    };
-
-    entity.flags.set_all(info.flags, true);
-
-    for &(link, tgt) in info.links {
-        entity.links.set(link, tgt);
-    }
-
-    if !info.site.is_null() {
-        bind_entity_to_site(entity, &mut sim.sites.data[info.site]);
-    }
-
-    let entity = entity.id;
-
-    for &(rel, parent) in info.parents {
-        sim.entities.set_parent(rel, entity, parent);
-    }
-
-    for &(rel, child) in info.children {
-        sim.entities.set_parent(rel, child, entity);
-    }
-
-    entity
 }
 
 fn init_cards(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) {
+    sim.prototypes.define(
+        "bonheddwr",
+        spawn::Prototype {
+            name: "Bonheddwr",
+            kind: "Card",
+            flags: &[Flag::IsCard],
+            has_location: true,
+        },
+    );
+
     struct Desc {
-        name: &'static str,
+        prototype: &'static str,
         location: &'static str,
     }
 
     const DESCS: &[Desc] = &[Desc {
-        name: "Bonheddwr",
+        prototype: "bonheddwr",
         location: "caer_ligualid",
     }];
 
     for desc in DESCS {
         let location = lookup_or_continue!(sim, desc.location, "location");
 
-        let info = SpawnEntity {
-            name: SpawnName::Fixed(desc.name),
-            kind: "Card",
-            parents: arena.alloc_slice([(HierarchyName::PlaceOf, location)]),
-            flags: &[Flag::IsCard],
-            ..Default::default()
-        };
-        spawn_entity(sim, info, rng);
+        let prototype =
+            get_or_continue!(sim.prototypes.lookup(desc.prototype), "Undefined prototype");
+
+        prototype.spawn(
+            sim,
+            arena,
+            rng,
+            &spawn::PrototypeArgs {
+                location,
+                ..Default::default()
+            },
+        );
     }
 }
 

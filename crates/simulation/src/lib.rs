@@ -18,3 +18,4 @@ pub use spatial::geom::{Extents, V2};
 
 mod init;
 mod names;
+mod spawn;
