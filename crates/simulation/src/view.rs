@@ -137,10 +137,11 @@ fn extract_object(sim: &Simulation, arena: &Arena, id: ObjectId) -> Object {
                 extract_entity(sim, arena, &sim.entities[sim.active_agent]),
             );
 
-            if sim.available_actions.has_any {
+            let actions = &sim.interaction.available_actions;
+            if actions.has_any {
                 obj.set(
                     "actions",
-                    sim.available_actions
+                    actions
                         .list
                         .iter()
                         .enumerate()

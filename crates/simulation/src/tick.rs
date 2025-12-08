@@ -57,7 +57,7 @@ pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) ->
 }
 
 fn handle_interaction(sim: &mut Simulation, arena: &Arena, interacted_with: ObjectId) {
-    let available_actions = std::mem::take(&mut sim.available_actions);
+    let available_actions = std::mem::take(&mut sim.interaction.available_actions);
 
     let rng = &mut {
         let seed = (sim.turn_number as u64).wrapping_mul(13).wrapping_add(2732);
@@ -85,7 +85,7 @@ fn determine_available_actions(sim: &mut Simulation) {
     let subject = &sim.entities[sim.active_agent];
     let target = &sim.entities[sim.interaction.selected_entity];
 
-    let mut actions = std::mem::take(&mut sim.available_actions);
+    let mut actions = std::mem::take(&mut sim.interaction.available_actions);
     let has_subject_and_object = !subject.id.is_null() && !target.id.is_null();
     actions.has_any = has_subject_and_object;
     actions.list.clear();
@@ -95,13 +95,6 @@ fn determine_available_actions(sim: &mut Simulation) {
             name: "Test Action",
             ..Default::default()
         });
-
-        if target.flags.get(Flag::IsPerson) {
-            actions.list.push(Action {
-                name: "Kiss",
-                ..Default::default()
-            });
-        }
 
         if target.flags.get(Flag::IsLocation) {
             let prototype = sim.prototypes.lookup("bonheddwr").unwrap_or_default();
@@ -116,7 +109,7 @@ fn determine_available_actions(sim: &mut Simulation) {
             })
         }
     }
-    sim.available_actions = actions;
+    sim.interaction.available_actions = actions;
 }
 
 fn refresh_colours(sim: &mut Simulation) {

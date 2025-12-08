@@ -1,5 +1,6 @@
 use util::arena::*;
 
+use crate::aspects::*;
 use crate::entities::{Entities, EntityId};
 use crate::sites::*;
 use crate::spawn::*;
@@ -8,12 +9,12 @@ use crate::tick::TickRequest;
 #[derive(Default)]
 pub struct Simulation {
     pub(crate) turn_number: usize,
-    pub(crate) interaction: Interaction,
     pub(crate) sites: Sites,
+    pub(crate) aspects: Aspects,
     pub(crate) entities: Entities,
     pub(crate) prototypes: Prototypes,
+    pub(crate) interaction: Interaction,
     pub(crate) active_agent: EntityId,
-    pub(crate) available_actions: AvailableActions,
 }
 
 impl Simulation {
@@ -32,6 +33,7 @@ impl Simulation {
 #[derive(Default)]
 pub(crate) struct Interaction {
     pub selected_entity: EntityId,
+    pub available_actions: AvailableActions,
 }
 
 #[derive(Default)]

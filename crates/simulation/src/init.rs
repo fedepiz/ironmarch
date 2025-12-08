@@ -12,6 +12,7 @@ use crate::{RGB, entities::*};
 pub(crate) fn init(sim: &mut Simulation, arena: &Arena, seed: u64) {
     let rng = &mut SmallRng::seed_from_u64(seed);
     sim.turn_number = 1;
+    init_aspects(sim);
     init_cultures(sim);
     init_prototypes(sim);
     init_sites(sim);
@@ -41,6 +42,19 @@ macro_rules! lookup_or_continue {
         }
         x
     }};
+}
+
+fn init_aspects(sim: &mut Simulation) {
+    struct Desc<'a> {
+        tag: &'a str,
+        name: &'a str,
+    }
+
+    const DESCS: &[Desc] = &[];
+
+    for desc in DESCS {
+        sim.aspects.define(desc.tag, desc.name);
+    }
 }
 
 fn init_cultures(sim: &mut Simulation) {
