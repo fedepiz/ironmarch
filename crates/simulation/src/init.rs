@@ -50,9 +50,18 @@ fn init_aspects(sim: &mut Simulation) {
         name: &'a str,
     }
 
-    const DESCS: &[Desc] = &[];
+    const DESC: &[Desc] = &[
+        Desc {
+            tag: "anglish",
+            name: "Anglish",
+        },
+        Desc {
+            tag: "brythonic",
+            name: "Brythonic",
+        },
+    ];
 
-    for desc in DESCS {
+    for desc in DESC {
         sim.aspects.define(desc.tag, desc.name);
     }
 }
@@ -94,16 +103,37 @@ fn init_cultures(sim: &mut Simulation) {
 }
 
 fn init_prototypes(sim: &mut Simulation) {
-    sim.prototypes.define(
-        "bonheddwr",
-        spawn::Prototype {
-            name: "Bonheddwr",
-            kind: "Card",
-            flags: &[Flag::IsCard],
-            has_location: true,
-            has_faction: false,
-        },
-    );
+    struct Desc<'a> {
+        tag: &'a str,
+        name: &'a str,
+        aspects: &'a [(&'a str, f64)],
+    }
+
+    const DESCS: &[Desc] = &[Desc {
+        tag: "bonheddwr",
+        name: "Bonheddwr",
+        aspects: &[],
+    }];
+
+    for desc in DESCS {
+        let aspects = leak(sim.aspects.parse_vector(desc.aspects));
+
+        sim.prototypes.define(
+            desc.tag,
+            spawn::Prototype {
+                name: desc.name,
+                kind: "Card",
+                flags: &[Flag::IsCard],
+                aspects: Some(aspects),
+                has_location: true,
+                has_faction: false,
+            },
+        );
+    }
+}
+
+fn leak<T: 'static>(x: T) -> &'static T {
+    Box::leak(Box::new(x))
 }
 
 fn init_sites(sim: &mut Simulation) {
@@ -340,6 +370,7 @@ fn init_locations(sim: &mut Simulation, arena: &Arena, rng: &mut SmallRng) -> In
             links: arena.alloc_slice([(LinkName::Culture, culture)]),
             parents: &[(HierarchyName::Faction, faction)],
             children: &[(HierarchyName::Capital, faction)],
+            ..Default::default()
         };
         let location = info.spawn(sim, rng);
         out.create_people.push(CreatePeople {

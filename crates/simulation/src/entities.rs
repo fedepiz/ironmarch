@@ -8,6 +8,7 @@ use util::misc::VecExt;
 use util::tagged::*;
 
 use crate::RGB;
+use crate::aspects::AspectVector;
 use crate::sites::SiteId;
 
 new_key_type! { pub(crate) struct EntityId; }
@@ -32,7 +33,10 @@ pub(crate) struct EntityData {
     /// Set of flags
     pub flags: Flags,
     pub links: Links,
+    // Name lists (for example, for cultures)
     pub name_lists: Option<Box<NameLists>>,
+    // Aspects
+    pub aspects: AspectVector,
 }
 
 #[derive(Default)]

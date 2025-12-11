@@ -36,7 +36,7 @@ pub(super) fn tick(sim: &mut Simulation, request: TickRequest, arena: &Arena) ->
         .unwrap_or(sim.active_agent);
 
     refresh_colours(sim);
-    determine_available_actions(sim);
+    determine_available_player_actions(sim);
 
     // Update interaction
     if let Some(object) = request.interacted_with_object {
@@ -81,7 +81,7 @@ fn handle_interaction(sim: &mut Simulation, arena: &Arena, interacted_with: Obje
     };
 }
 
-fn determine_available_actions(sim: &mut Simulation) {
+fn determine_available_player_actions(sim: &mut Simulation) {
     let subject = &sim.entities[sim.active_agent];
     let target = &sim.entities[sim.interaction.selected_entity];
 

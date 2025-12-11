@@ -1,27 +1,28 @@
 use rand::rngs::SmallRng;
 use slotmap::Key;
-use slotmap::SlotMap;
-use slotmap::new_key_type;
 use util::arena::Arena;
 use util::tagged::TaggedCollection;
 use util::tagged::Tags;
 
+use crate::aspects::*;
 use crate::entities::*;
 use crate::simulation::*;
 use crate::sites::*;
 use crate::view::RGB;
 
-new_key_type! { pub struct PrototypeId; }
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+pub struct PrototypeId(pub usize);
 
 #[derive(Default)]
 pub(crate) struct Prototypes {
-    entries: SlotMap<PrototypeId, Prototype>,
+    entries: Vec<Prototype>,
     tags: Tags<PrototypeId>,
 }
 
 impl Prototypes {
     pub fn define(&mut self, tag: impl Into<String>, proto: Prototype) -> PrototypeId {
-        let id = self.entries.insert(proto);
+        let id = PrototypeId(self.entries.len());
+        self.entries.push(proto);
         self.tags.insert(tag, id);
         id
     }
@@ -34,13 +35,14 @@ pub(crate) struct Prototype {
     pub flags: &'static [Flag],
     pub has_location: bool,
     pub has_faction: bool,
+    pub aspects: Option<&'static AspectVector>,
 }
 
 impl std::ops::Index<PrototypeId> for Prototypes {
     type Output = Prototype;
 
     fn index(&self, index: PrototypeId) -> &Self::Output {
-        &self.entries[index]
+        &self.entries[index.0]
     }
 }
 
@@ -50,7 +52,7 @@ impl TaggedCollection for Prototypes {
     fn lookup(&self, tag: &str) -> Option<Self::Output> {
         self.tags
             .lookup(tag)
-            .and_then(|id| self.entries.get(id))
+            .and_then(|id| self.entries.get(id.0))
             .copied()
     }
 }
@@ -92,6 +94,7 @@ impl Prototype {
             links: &[],
             parents: parents.into_bump_slice(),
             children: &[],
+            aspects: self.aspects,
         };
 
         spawn_entity(sim, spawn, rng)
@@ -109,6 +112,7 @@ pub(crate) struct SpawnEntity<'a> {
     pub links: &'a [(LinkName, EntityId)],
     pub parents: &'a [(HierarchyName, EntityId)],
     pub children: &'a [(HierarchyName, EntityId)],
+    pub aspects: Option<&'a AspectVector>,
 }
 
 impl SpawnEntity<'_> {
@@ -183,6 +187,8 @@ fn spawn_entity(sim: &mut Simulation, info: SpawnEntity, rng: &mut SmallRng) -> 
     if !info.site.is_null() {
         bind_entity_to_site(entity, &mut sim.sites.data[info.site]);
     }
+
+    entity.aspects = info.aspects.cloned().unwrap_or_default();
 
     let entity = entity.id;
 
